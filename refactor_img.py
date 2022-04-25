@@ -1,10 +1,12 @@
 # from cv2 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import time
 import cv2
 from rotate_image import RotateImage, show_img, New_Rotate
 from Update_photo import Update
+from test_red_contour import Passport1
 from SearchBD import Search
 from Choose_correct_word import Doctr
 import uuid
@@ -18,7 +20,7 @@ except ImportError:
 import pytesseract as pt
 
 
-class Passport(RotateImage, New_Rotate,  Update, Doctr, Search):
+class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
     filePath = False
 
     new_file_path = False
@@ -30,6 +32,209 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Search):
         # Doctr.add_files(self, self.filePath)
         # Doctr.find_contours(self)
 
+
+    # Tesseract лучше работает, когда высота букв примерно 30 пикселей, dpi не особо влияем
+    # 1 Rotate
+    def rotation(self, img, key=1):
+        rotated = New_Rotate.rotate(self, img, key=1)
+        return rotated
+
+    # 2 PreProcess
+    def preProcess(self, img):
+        # 2.1 DPI
+        img = Update.change_dpi(self, img.copy())
+
+        # 2.2 Unsharp
+        img = Update.unsharp_mask(self, img.copy())
+
+        # 2.3 CLACHE
+        img = Update.try_contrast_CLACHE(self, img.copy())
+
+        # 2.4 Gausian
+        img  = Update.gaussian_blur(self, img.copy(), kernel=(2,2))
+
+        # 2.5 Contrast
+        img = Update.bright_contrast(self, img.copy(), contrast=1.5)
+
+        return img
+
+    # 3 Finding FIO
+    def findingBoxes(self, img):
+
+        RESIZED_IMAGE_HEIGHT = 600
+        resizedImage = imutils.resize(img.copy(), height=self.RESIZED_IMAGE_HEIGHT)
+
+        # 3.1 Using DNN
+        boxes = Update.dnn_using(self, resizedImage.copy())
+
+        # 3.2 Using Algorithm
+        boxes = Passport1.processFullName(self, resizedImage)
+
+        # 3.3 Doctr
+        cv2.imwrite('save_1.jpg', img)
+
+        #box = Doctr.
+        return boxes
+
+    # 4 Detecting Text
+    def detectingText(self, img):
+        pass
+
+    # 4.5 Translation text
+    def translationText(self, text):
+        pass
+
+    # 5 Check BD
+    def checkingBD(self, text):
+        pass
+
+    def full_process_ocr(self, path=''):
+        orig_image = self.__read_img()
+
+        # 1 Rotate
+        print('orig.shape', orig_image.shape)
+        img = self.rotation(orig_image.copy(), key = 1)
+        print('img.shape', img.shape)
+
+        # 2 PreProcess (Resize, DPI, Unsharp, contrast, bright, filter, and more ..)
+
+
+        # 3 Finding FIO, date, FMS, code, снизу машинная строка (Algorithm, dnn, doctr, ...)
+        # 4 Preprocessing (Rotate, Resize, DPI, Unsharp, ...)
+        # 5 Detecting text (Tesseract, Doctr, dnn, ...)
+        # 5.5 При использовании doctr, dnn or tesseract на английском перевести(перетранслировать) слова на русский
+        # 6 Сверить значения с БД, сравнить и посчитать ошибки распознавания и детекции текстов
+
+
+    def test_quality2(self, flag = 0, path=''):
+        orig_image = self.__read_img()
+        filepath = self.filePath+str(flag)
+        print(filepath+'.txt')
+        if flag == 0:
+            f = open(filepath + '.txt', 'w')
+            text = self.ocr_core_text(orig_image)
+            print(self.divide_on_words(text))
+            f.write(text)
+            f.close()
+        else:
+            f = open(filepath + '.txt', 'w')
+            rotated = New_Rotate.rotate(self, orig_image, key=1)
+            img = rotated
+            h, w = img.shape[0:2]
+            HEIGHT_CONST = 600
+            WIDTH_CONST = 600
+            if h<HEIGHT_CONST:
+                img = Update.resize_img(self, img, HEIGHT_CONST/h, HEIGHT_CONST/h, interpolation=cv2.INTER_AREA)
+            if w<WIDTH_CONST:
+                img = Update.resize_img(self, img, WIDTH_CONST / w, WIDTH_CONST / w, interpolation=cv2.INTER_AREA)
+            rotated_img = img.copy()
+            Doctr.find_contours(self, rotated_img)
+            rotated_img = Update.try_contrast_CLACHE(self, rotated_img)
+            #show_img(Update.try_contrast_CLACHE(self, rotated_img), 'CLACHE')
+            Update.corner_images(self, rotated_img.copy())
+            #norm_contr = Update.get_to_norm_contrast(self, rotated_img)
+
+            #gausian = Update.gaussian_blur(self, norm_contr)
+            #show_img(gausian, 'Gausian')
+
+            #cv2.imwrite('save_1.jpg', rotated_img)
+            #os.system('mogrify -set density 400 save_1.jpg')
+            #Doctr.find_contours(self, 'save_1.jpg')
+            #os.system('rm save_1.jpg')
+            #Update.dnn_using(self, orig_image)
+            #Update.add_alpha_channel(self, rotated_img)
+            #img = Update.change_hsv(self, rotated_img, hue = -30, satur = 0, value = 0)
+            #Update.using_mask(self, rotated_img)
+
+            boxes = Update.dnn_using(self, rotated_img)
+            for box in boxes:
+                origImageCut = rotated_img[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+                show_img(origImageCut, 'Cuts')
+                unsharp = Update.unsharp_mask(self, origImageCut)
+                gaus = Update.gaussian_blur(self, unsharp, (5,5))
+                img = Update.get_to_norm_contrast(self, gaus)
+
+                show_img(img, 'Contrast')
+
+                #heightKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 5))
+                #dilate = cv2.dilate(img, heightKernel)
+
+                #dilate = Update.dilation(self, dilate)
+                #widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 2))
+                #erose = cv2.erode(img, widthKernel, borderType=cv2.BORDER_REFLECT)
+                widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 2))
+                img = cv2.dilate(img, widthKernel, borderType=cv2.BORDER_REFLECT)
+                heightKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 5))
+                dilate = cv2.dilate(img, heightKernel)
+                #show_img(dilate, 'dilate+erose')
+
+                rotated_cut = New_Rotate.another_rotate(self, origImageCut, dilate)
+                show_img(rotated_cut, 'Rotated_cut')
+                img = rotated_cut
+                cv2.imwrite('save_1.jpg', img)
+                os.system('mogrify -set density 300 save_1.jpg')
+                img = cv2.imread('save_1.jpg')
+                os.system('rm save_1.jpg')
+                #show_img(Update.erosion(self, Update.black_white(self, img), (10,2), board='CONSTANT'), 'black_white')
+                show_img(img, 'Changes')
+
+                text = self.ocr_core_text(gaus)
+                print(self.divide_on_words(text))
+            #show_img(rotated_img, 'Creating mask')
+            #img = Update.change_hsv(self, rotated_img, satur = 256)
+            #show_img(img, 'After saturation')
+
+            #img = Update.sobel_operator(self, img)
+            #show_img(img, 'Sobel')
+            #img = Update.unsharp_mask(self, img)
+
+            #img = Update.sharp_image(self, img, t = 12, n = 2)
+            #show_img(img, 'Sharp')
+            #img = Update.aprox_poly(self, img, rotated_img)
+            #Update.blob_detector(self, img)
+            #img = Update.change_hsv(self, img, value = 30)
+            #show_img(img, 'HSV')
+            #resized = Update.resize_img(self, rotated, 1.0, 1.0, interpolation=cv2.INTER_AREA)
+            #unsharp = Update.unsharp_mask(self, rotated)
+            #gray = Update.black_white(self, unsharp)
+            #img = Update.getContours(self, gray, unsharp)
+            #show_img(img, 'Check')
+            #subtract = Update.subtract(self, img)
+            text = self.ocr_core_text(img)
+            print(self.divide_on_words(text))
+            #img = Update.sobel_operator(self, orig_image)
+            #img = Update.draw_contours(self, img, orig_image)
+            #show_img(img, 'Afterfilling contours')
+
+            #bl_wh = Update.black_white(self, orig_image)
+            #cols, rows = orig_image.shape[0:2]
+            #img = Update.getEdges(self, orig_image)
+            #img = Update.dilation(self, img, k=(2,2))
+            #img = Update.getContours(self, img, orig_image)
+            #show_img(img, 'After contours')
+            #sub = Update.subtract(self, img)
+            #img = Update.unsharp_mask(self, sub)
+            #img = New_Rotate.rotate(self, img)
+            #img = Update.resize_img(self, img, int(cols*1.5), int(rows*1.5), interpolation=cv2.INTER_AREA)
+            #show_img(sub, 'subtract')
+            #text = self.ocr_core(img)
+            #print(self.divide_on_words(text))
+            '''hsv = (-30, 0 , 30)
+            cols, rows = orig_image.shape[0:2]
+            img = orig_image.copy()
+            Update.getEdges(self, img)
+            #img = New_Rotate.rotate(self, img)
+            img = Update.resize_img(self, img, int(cols*1.5), int(rows*1.5), interpolation=cv2.INTER_AREA)
+            img = Update.change_hsv(self, img, hue=hsv[0], value=hsv[0], satur=hsv[0])
+            img = Update.unsharp_mask(self, img)
+            #img = Update.bright_contrast(self, img, contrast=2.0)
+            show_img(img, 'after_changing')
+            text = self.ocr_core(img)
+            print(self.divide_on_words(text))
+            f.write(text)
+            f.close()'''
+        return None
+
     def test_quality(self):
         orig_image = self.__read_img()
         print("For Origin")
@@ -38,7 +243,7 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Search):
         change_size = np.array(range(10, 25, 5))/10
         hsv = (-30, 0, 30)
         for i in change_size:
-            resize = Update.resize_img(self, orig_image, cols = int(cols*i), rows = int(rows*i), interpolation = cv2.INTER_CUBIC)
+            resize = Update.resize_img(self, orig_image, cols*i, rows*i, interpolation = cv2.INTER_CUBIC)
             #show_img(resize, f"Resize {i}")
             #chng_hsv = Update.change_hsv(self, resize, hue=hsv[0], value=hsv[0], satur=hsv[0])
             #black_white = Update.black_white(self, resize)
@@ -47,7 +252,7 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Search):
             #show_img(erode, 'After_all')
             unsharp = Update.unsharp_mask(self, resize)
             print(f"OCR+origin+resize+{i}+black_white+dilate/erode+unsharp")  #hsv+{hsv[0]}+{hsv[0]}+{hsv[0]}
-            print(self.ocr_core(unsharp))
+            print(self.ocr_core_text(unsharp))
         rotated = New_Rotate.rotate(self, orig_image)
         show_img(rotated, 'Rotated')
         #Update.change_hsv(self, unsharp, hue=h, value=v, satur=s), f'hue={h}, satur={s}, value={v}')
@@ -256,11 +461,20 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Search):
     def getUniqueFilePath(self):
         return self.RESULT_IMAGES_FOLDER + '/' + str(uuid.uuid4()) + '.' + self.RESULT_IMAGES_EXTENSION
 
-    def ocr_core(self, img):
+    def ocr_core_text(self, img):
         """This function will handle the core OCR"""
-
+        #rus = 'абвгдеёжзийклмнопрстуфхцчшщЪыьэюя'
         text = pt.pytesseract.image_to_string(img, lang='rus')
+        #text = pt.pytesseract.image_to_string(img, lang='rus', config = f'--psm 12 --oem 3 -c tessedit_char_whitelist={rus}{rus.upper()}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
         return text.strip().lower().capitalize()
+
+    def ocr_core_boxes(self, img):
+        boxes = pt.pytesseract.image_to_boxes(img)
+        return boxes
+
+    def divide_on_words(self, text):
+        text = text.split('\n')
+        return list(map(str.strip, text))
 
 
 '''def ocr_core(img):

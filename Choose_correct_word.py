@@ -5,8 +5,9 @@ from doctr.models import crnn_vgg16_bn, crnn_mobilenet_v3_large
 import numpy as np
 #from doctr.io import read_img_as_numpy, read_img_as_tensor
 #import tensorflow as tf
+import cv2
 import matplotlib.pyplot as plt
-
+import os
 from doctr.models import ocr_predictor
 
 class Doctr:
@@ -23,18 +24,21 @@ class Doctr:
     #    self.filenames.append(filename)
 
     def find_contours(self, img):
+        img_path = 'save1.jpg'
+        cv2.imwrite(img_path, img)
         #for img in images:
-            doc = DocumentFile.from_images(img)
+        doc = DocumentFile.from_images(img_path)
             #a = [doc]
             #doc
             #print(doc.shape)
             #a =  np.array([img])
 
-            result = self.model(doc)
-            result.show(doc)
+        result = self.model(doc)
+        result.show(doc)
+        os.system('rm save1.jpg')
             #print(result)
             #json_file = result.
-            Doctr.__synthetic_pages__(self, result)
+            #Doctr.__synthetic_pages__(self, result)
 
     def __synthetic_pages__(self, result):
         synthetic_pages = result.synthesize()

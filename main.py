@@ -31,12 +31,29 @@ def home_page():
     return render_template('index.html')
 
 '''
-
+def change_density(count, path):
+    if count ==0:
+        os.system('mkdir temp1/')
+    os.system('cp ' + path + ' temp1/')
+    file_list = glob.glob('temp1/*')
+    for i in file_list:
+        if 'orig' in i:
+            os.system('mv ' + i + ' temp1/test.jpeg')
+            break
+    os.system('mogrify -set density 300 temp1/test.jpeg')
+    pas1 = Passport('temp1/test.jpeg')
+    pas1.test_quality2(count, path)
+    print(file_list)
+    os.system('rm temp1/test.jpeg')
+    return None
 
 if __name__ == '__main__':
     #app.run()
-    filename = 'templates/1.jpeg'
-
+    #filename1 = 'templates/1.jpeg'
+    #filename2 = 'templates/corr3.jpeg'
+    filenames = []
+    for i in range(7, 9):
+        filenames.append(f'templates/orig{i}.jpeg')
     #captch_ex(filename)
     #img = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
     #plt.imshow(img)
@@ -54,25 +71,20 @@ if __name__ == '__main__':
     #doctr_find_texts([filename])
 
     #Using Passport
-    pathname = 'templates/corr3.jpg'
-    os.system('mkdir temp1/')
-    os.system('cp '+pathname+' temp1/')
-    file_list = glob.glob('temp1/*')
-    os.system('mv '+file_list[0]+' temp1/test.jpg')
-    print(file_list)
-    os.system('mogrify -set density 300 temp1/test.jpg')
-    pas1 = Passport('templates/corr.jpg')
-    pas2 = Passport('temp1/test.jpg')
-    #pas = Passport('templates/1.jpeg')
-    print("pas1")
-    pas1.test_quality()
-    print("pas2")
-    pas2.test_quality()
-    os.system('rm -r temp1/')
+
+    for (count, path) in enumerate(filenames):
+        print(path)
+        pas1 = Passport(path)
+        pas1.test_quality2(0, path)
+        change_density(count+1, path)
+    #pas1 = Passport('templates/orig3.jpeg')
+    #pas1.test_quality2(0, 'templates/orig3.jpeg')
+    #change_density(0, 'templates/orig3.jpeg')
+    #os.system('rm -r temp1/')
     #pas.__read_img()
     #pas.rotate_img()
     #pas.getProcessedNameFilePaths()
-    #pas.getProcessedSurnameFilePaths()
+    #pas.getProcessedSurnameFilePths()
     #pas.getProcessedPatronymicFilePaths()
 # print(ocr_core('templates/image1.png'))
 
