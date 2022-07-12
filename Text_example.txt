@@ -1,1 +1,5 @@
 text:  ['0', 'CHACK', 'A3', 'EA', 'EP', 'AUM', 'N', 'TII', 'N108', 'OTHEJIA', 'YAMC', 'POCCMM', 'no', 'ectnon', 'CAHKI-IETEPBPIJ', 'M', 'VIEHMHIYPAICKON', 'OBJI.', 'B', 'TATMMHCKOM', 'P-HE', '22.04.2015', '470-024', '5', 'lve', 'eu', '', 'Me', 'as', '-', '-', '0-024', 'OJIEAHMKOB', 'PYCJIAH', 'BAXTMSIPOBMY', 'TOP.JIEHMHIPAIL', 'JT', 'MYX.', 'lATe', '15.07.1987', '-', 'a', '-', 's', 'PNRUSOLEQNIKOVE<RUSLANKBAHTIBROVI3<<<<<<<<<<', '4116759737RU58707154RCCC5150422470024<06']
+
+
+'O', 'JI', 'E', 'A', 'H', 'M', 'K', 'O', 'B'
+['ОУПЕДНМКОВ', 'ОУПЕДНМКОБ', 'ОУПЕДНМКОЫ', ... 'ОУПЕДНМКОБ', 'ОУПЕДНМКОЫ', 'ОУПЕДНМКОВ']
