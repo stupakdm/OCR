@@ -334,11 +334,13 @@ class Update:
         if ind_x[-1] < W - 4:
             ind_x[-1] += 4
 
-        img = img[ind_y[0]:ind_y[-1], ind_x[0]:ind_x[-1]]
-        img = self.gaussian_blur(img, kernel=(3, 3))
-        # print(np.where(dest > 0.01* dest.max()))
-        # img[dest > 0.01 * dest.max()] = [0,0,255]
-        show_img(img, 'CornerHarris')
+        if (((ind_x[0] - 0)+(W-ind_x[-1])) > abs(ind_x[-1]-ind_x[0])//2) or (((ind_y[0] - 0)+(H-ind_y[-1])) > abs(ind_y[-1]-ind_y[0])//2):
+            print('Cropp width and height: ', H, W)
+            img = img[ind_y[0]:ind_y[-1], ind_x[0]:ind_x[-1]]
+            img = self.gaussian_blur(img, kernel=(3, 3))
+            # print(np.where(dest > 0.01* dest.max()))
+            # img[dest > 0.01 * dest.max()] = [0,0,255]
+            show_img(img, 'CornerHarris')
         return img
 
     def try_contrast_CLACHE(self, img):
@@ -497,7 +499,7 @@ class Update:
 
         orig = img.copy()
         # model = cv2.dnn.readNet(model = "frozen_east_text_detection.pb", config='resnet50.config.txt', framework = 'Tensorflow')
-        model = cv2.dnn.readNet(model="frozen_east_text_detection.pb")
+        model = cv2.dnn.readNet(model="../frozen_east_text_detection.pb")
         # model.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
         # model.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
@@ -832,11 +834,11 @@ class Update:
         show_img(orig_img, 'aprox_poly')
         return image
 
-    def unsharp_mask(self, image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
+    def unsharp_mask(self, image, kernel_size=(3, 3), sigma=1.0, amount=1.0, threshold=0):
         """Return a sharpened version of the image, using an unsharp mask."""
         # widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 2))
         try:
-            blurred = self.gaussian_blur(image, (3, 3), sigma)
+            blurred = self.gaussian_blur(image, kernel_size, sigma)
 
             # blurred = self.median_blur(image)
             # blurred = self.averaging_blur(image)
@@ -853,10 +855,11 @@ class Update:
 
 
 def show_img(img, title):
+     pass
     # print(img.shape)
     # print(img)
-    """plt.imshow(img)
-    plt.title(title)
-    plt.show()"""
+     #plt.imshow(img)
+     #plt.title(title)
+     #plt.show()
 # def
 # def calcGray

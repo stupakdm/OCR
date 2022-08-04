@@ -15,8 +15,8 @@ from Image_update.updating_image import Update
 
 # from Image_update.updating_image import Update
 # from Image_update.red_contour import Passport1
-"""from multiprocessing.dummy import Pool as ThreadPool
-from transliterate import translit, get_translit_function"""
+from multiprocessing.dummy import Pool as ThreadPool
+"""from transliterate import translit, get_translit_function"""
 
 try:
     from PIL import Image
@@ -50,6 +50,8 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
         self.filePath = filepath
         Doctr.choose_model(self)
         Search.start(self)
+        self.check_image = None
+        self.check_region = False
         # Doctr.add_files(self, self.filePath)
         # Doctr.find_contours(self)
 
@@ -62,10 +64,21 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
         cropped = Update.corner_images(self, img)
         return cropped
 
+    #     Check orientation
+    # 0.8 Check
+    def check_orientation(self, img):
+        self.check_image, self.check_flag = Passport1.makeCorrectOrientation(self, img)
+        if not self.check_flag:
+            print('Not found')
+        else:
+            print('Found')
+        return None
+
     #   50/50
     # 1 Rotate
     def rotation(self, img, key=1):
-        rotated = New_Rotate.rotate(self, img, key=1)
+        #key = 2
+        rotated = New_Rotate.rotate(self, img, key=key)
         return rotated
 
     #   50/50
@@ -80,20 +93,34 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
     # 2 PreProcess
     def preProcess(self, img, key = 1):
         # 2.1 DPI
+        image_orig = img.copy()
         show_img(img, "Before prePorcess")
-        img = Update.change_dpi(self, img.copy())
-
+        img = Update.change_dpi(self, img.copy(), dpi = 450)
+        show_img(img, 'Image after dpi')
+        img = Update.change_dpi(self, img.copy(), dpi = 600)
+        show_img(img, 'Image after dpi')
         # 2.2 Unsharp
-        img = Update.unsharp_mask(self, img.copy())
-
+        img = Update.unsharp_mask(self, img.copy(), sigma=1.5, threshold=1, amount=2.0, kernel_size=(3,3))
+        #img = Update.unsharp_mask(self, img.copy(), sigma=1.5, threshold=1, amount=4.0, kernel_size=(2, 2))
+        show_img(img, 'Image after unsharp_mask')
         # 2.3 CLACHE
-        img = Update.try_contrast_CLACHE(self, img.copy())
+        #img = Update.try_contrast_CLACHE(self, img.copy())
+        #show_img(img, 'Image after CLACHE')
 
         # 2.4 Gausian
-        #img  = Update.gaussian_blur(self, img.copy(), kernel=(2,2))
+        #img  = Update.gaussian_blur(self, img.copy(), kernel=(3,3))
+        #show_img(Update.sharp_image(self, img.copy()), 'Sharp_image before bright_contrast')
 
-        # 2.5 Contrast
-        img = Update.bright_contrast(self, img.copy(), contrast=1.5)
+        # Плохо
+        #show_img(Update.true_sharp(self, img.copy(), image_orig), 'true_Sharp_image before bright_contrast')
+
+        # 2.5 Contrast   (Нужно подобрать пар-ры)
+        img = Update.bright_contrast(self, img.copy(), contrast=1.1, bright = 0)
+        show_img(img, "Image after bright-contrast")
+        # Не надо,скорее всего
+        #show_img(Update.sharp_image(self, img.copy()), 'Sharp_image after bright_contrast')
+        #show_img(Update.true_sharp(self, img.copy(), image_orig), 'true_Sharp_image after bright_contrast')
+
 
         show_img(img, "After prePorcess")
         # 2.6 Mask_contrast
@@ -115,13 +142,15 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
 
         # 3.2 Using Algorithm
         if key == 2:
+            Passport1.processFullNameInternal(self, self.orig_img)
             boxes = Passport1.processFullName(self, resizedImage)
+            print('boxes', boxes)
 
         # 3.3 Doctr
         if key == 3:
             boxes = Doctr.find_contours(self, img)
             boxes = [x for n,x in enumerate(boxes) if x not in boxes[:n]]
-            print(boxes)
+            #print(boxes)
 
         # 3.4 Tesseract
         if key == 4:
@@ -148,7 +177,7 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
             res = Doctr.find_contours(self, img)
             boxes = res[0]
             text = res[1]
-            print(text)
+            print("text: ", text)
             all_words = []
             if flag == 1:
                 l = len(text)
@@ -179,10 +208,11 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                     else:
                         del text[j]
                         l = len(text)
-            print("After adding: ", text)
+            # print("After adding: ", text)
             if flag == 0:
+                #print("text:", text)
                 text = Doctr.filter_words(self, text)
-            print("After Doctr filter:", text)
+            # print("After Doctr filter:", text)
             #text = text[10:]
             #text = ['EAE', 'MMJIMUMM', 'PAMOHA', 'MCK', 'ASI', '-CC', '24', 'OTIEJIOM', 'HEBCKOTO',
             #         'llactopy', 'BHA', 'CAHKT', 'TETEPBYPTA', '782-024', '04.10.2006', 'Koa', 'noApaaseNeNnts', 'Aara',
@@ -206,7 +236,7 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                 #text_fms = text[0:code_ind]
                 #text_fms = text[0:len(text)//2]
 
-                    text_fio = text[code_ind+1:len(text)-2]
+                    text_fio = text[code_ind+3:len(text)]
                     j = 0
                 else:
                     text_fms = text[0:len(text)//2]
@@ -229,14 +259,15 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                     else:
                         j += 1
 
-
+                # print('2 text: ', text)
                 #print("text_fms: ", text_fms)
-                print("pers_data: ", self.person_data)
-                print("text_fio: ", text_fio)
+                # print("pers_data: ", self.person_data)
+                # print("text_fio: ", text_fio)
                 #threads= []
                 #manager = multiprocessing.Manager()
                 #self.result_list = manager.list()
-                all_words_fio = []
+
+                #all_words_fio = []
                 #all_words_fms = []
                 #pool_size = 1
 
@@ -251,14 +282,18 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                 #    w.start()
                 #    w.join()
                     #all_words_fio.append(w)
+
                 #p = Process(target=self.translationText, args=text)
-                #pool = ThreadPool(pool_size)
-                #with ThreadPool(pool_size) as p:
-                #    all_words_fio = p.map_async(self.translationText, text_fio).get()
+
+                # Parallel with ThreadPool
+                """pool_size = 5
+                with ThreadPool(pool_size) as p:
+                    all_words_fio = p.map(self.translationText, text_fio)"""
                 #pool.map_async(self.translationText, text_fio, callback=self.collect_result)
                 #pool.close()
                 #pool.join()
 
+                # Parallel with asyncio
                 """p = Profiler(async_mode='disabled')
                 with p:
                     loop = asyncio.get_event_loop()
@@ -269,7 +304,12 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                     all_words_fio = loop.run_until_complete(main_task)
                     #loop.close()
                 p.print()"""
-                all_words_fio = list(map(self.translationText, text_fio))
+
+                # Single with map
+                # print('2 text_fio: ', text_fio)
+                all_words_fio = list(filter(None, map(self.translationText, text_fio)))
+
+                # print('2 all_words_fio:', all_words_fio)
                 """p = Profiler(async_mode='disabled')
                 
                 with p:
@@ -313,8 +353,16 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                     all_words_fms = loop.run_until_complete(main_task)
                     # loop.close()
                 p.print()"""
-                all_words_fms = list(map(self.translationText, text_fms))
-                print(f"all_words_fms: {all_words_fms}")
+
+                # Parallel with ThreadPool
+                """pool_size = 5
+                with ThreadPool(pool_size) as p:
+                    all_words_fms = p.map(self.translationText, text_fms)"""
+
+                # Single with map
+                all_words_fms = list(filter(None, map(self.translationText, text_fms)))
+                # print('all_words_fms:', all_words_fms)
+                # print(f"all_words_fms: {all_words_fms}")
                 #self.person_data['фмс'] = pool.map_async(Search.cpr_spec,)
                 self.person_data['фмс'] = Search.cpr_spec(self, all_words_fms)
                 #self.person_data = Search.cpr_spec_fms(self, all_words_fms, self.person_dat)
@@ -342,7 +390,17 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
                     all_words_fio = loop.run_until_complete(main_task)
                     # loop.close()
                 p.print()"""
-                all_words_fio = list(map(self.translationText, text))
+
+                # Parallel with ThreadPool
+                """ pool_size = 5
+                with ThreadPool(pool_size) as p:
+                    try:
+                        all_words_fio = p.map(self.translationText, text)
+                    except:
+                        exit(0)"""
+
+                # Single with map
+                all_words_fio = list(filter(None, map(self.translationText, text)))
 
             #pool_size = 5
             #pool = Pool(processes=pool_size)
@@ -366,23 +424,38 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
     #   30/70
     # 4.5 Translation text
 
-    """def proc(self, pr):
-        pr.start()
-        pr.join()"""
-
     def translationText(self, text):
-        print('old word: ', text)
+        if self.check_region:
+            return None
+        # print('old word: ', text)
         text, flag = Doctr.poss_words1(self, text)
-        print('new word: ',text, flag)
+        # print('text: ', len(text))
+        # print('new word: ',text, flag)
+        # Точка останова
+        # input()
         #t = random.randint(0, 3)
         #time.sleep(t)
         #await asyncio.sleep((random.uniform(1, 3)))
+        #print('text after poss_words1: ', text)
         words = Doctr.divide_word(self, text, [])
+
+        #print('words after divide_word: ', words)
+        # print('words: ', len(words))
+        # Точка останова
+        # input()
         text = Doctr.translating(self, words, flag)
-        print(text)
-        self.result_list.append(text)
-        print('result_list: ', self.result_list)
-        return text
+
+        print('text after translating: ', text)
+        if 'обл' in text.lower():
+            self.check_region = True
+
+        if text != '':
+            print(text)
+            self.result_list.append(text)
+        # print('result_list: ', self.result_list)
+            return text
+        else:
+            return None
 
     result_list = []
     def collect_result(self, result):
@@ -402,21 +475,36 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
     def full_process_ocr(self, path='', key_n=3):
         orig_image = self.__read_img()
         self.result_list.clear()
-        # 0.5 Cropp
-        #print('Cropp')
-        img = self.cropp(orig_image.copy())
-        #print()
 
-        img = orig_image.copy()
+        # 0.5 Cropp
+        print('Cropp')
+        show_img(orig_image, 'Origin')
+        img = self.cropp(orig_image.copy())
+        # show_img(img, 'Crop before rotate')
+        print()
+
+        # 0.8 Check for right orientation
+        print('Check for right orientation')
+        self.check_orientation(orig_image)
+        print()
+
+        #img = orig_image.copy()
         # 1 Rotate
         print('Rotate')
         print('orig.shape', img.shape)
+
+        # Закомменчено: если оно под правильным углом, то не нужно поворачивать изображение(ПРОТЕСТИРОВАТЬ для других)
+        #if not self.check_flag:
         img = self.rotation(img, key = 1)
+        show_img(img, 'Rotated')
         print('img.shape', img.shape)
         print()
+        #else:
+        #img = self.check_image
 
         print('Cropp')
-        img = self.cropp(img.copy())
+        #img = self.cropp(img.copy())
+        show_img(img, 'Crop after rotate')
         print()
 
         # 2 PreProcess (Resize, DPI, Unsharp, contrast, bright, filter, and more ..)
@@ -467,6 +555,9 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
             #input()
 
             #7 Finding Серия и Номер
+            self.check_region = False
+            if self.check_flag:
+                img = self.check_image
             rotate_img = imutils.rotate_bound(img, -90)
             show_img(rotate_img, "rotated on -90 degree")
             res = self.detectingText(rotate_img, key=key_nn, flag=1)
@@ -481,6 +572,8 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
             print(data2)
             t = open(f"file{random.randint(1,100)}.txt", 'w')
             for i in data2.keys():
+                if data2[i] == None:
+                    data2[i] = ''
                 t.write(data2[i])
                 t.write('\n')
             time.sleep(5)
@@ -497,23 +590,27 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
         print('FindingBoxes')
         if key_nn != 3:
             boxes = self.findingBoxes(img, key=key_nn)
+            #img[boxes[0]]
         print()
 
         # 4 Preprocessing (Rotate, Resize, DPI, Unsharp, ...)
         words = []
         print('PreProccesing text boxes')
-        """
+
         for box in boxes:
             # 4.1 Rotate
             print('Rotate Boxes')
             box_img = img[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+            #show_img(box_img, '')
             box_img  = self.rotation_boxes(box_img)
+            show_img(box_img, 'Rotated_box')
             print()
 
             # 4.2 PreProcess
             print('PreProcces boxes')
             try:
                 box_img = self.preProcess(box_img, key = 2)
+                show_img(box_img, 'Preprocess box')
             except:
                 pass
             print()
@@ -543,7 +640,7 @@ class Passport(RotateImage, New_Rotate,  Update, Doctr, Passport1, Search):
             print(text)
             words.append(text)
             print()
-        """
+
         return words
 
     def test_quality2(self, flag = 0, path=''):

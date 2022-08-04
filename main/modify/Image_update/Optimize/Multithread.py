@@ -1,4 +1,5 @@
 from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing import Process
 import threading
 
 
@@ -26,4 +27,14 @@ class MyThreads:
             else:
                 return None
 
+"""class Worker(Process):
+    def __init__(self):
+        super().__init__()
+        
+    def run(self, func):
+        print(f{})
+
+class procs:
+    proc_queue = []
+    def __init__(self):"""
 #MyThreads.start_threading( func, filenames='aer', args=['tgtg', 'rtgr', 0])

@@ -3,7 +3,7 @@ from difflib import SequenceMatcher
 import Levenshtein as lv
 import numpy as np
 import pandas as pd
-
+import time
 
 class Search:
     special_words = ('дата', 'рождения', 'место', 'гор', 'код', 'обл', 'муж', 'пос', 'пол', 'россия', 'федерация')
@@ -86,12 +86,118 @@ class Search:
     def filter_names(self, word):
         return None if 'і' in word or 'ї' in word else word
 
+    def filter_city(self, city):
+        city = city.lower()
+        if 'респ' in city or 'обл' in city or 'гор' in city:
+            return None
+        else:
+            return city.capitalize()
+
+    def city_comparing(self, prob_cities, fms):
+        if len(prob_cities) == 0:
+            return None
+        max_word = prob_cities[0]
+        max_rate = 0
+
+        if fms != None:
+            w = fms.split(' ')
+            # w = word[0].split(' ')
+            if 'ПО' in w:
+                w = w[w.index('ПО') + 1:]
+            elif 'МВД' in w:
+                w = w[w.index('МВД') + 1:]
+            elif 'ОВД' in w:
+                w = w[w.index('ОВД') + 1:]
+            elif 'РОВД' in w:
+                w = w[w.index('РОВД') + 1:]
+            elif 'ОМВД' in w:
+                w = w[w.index('ОМВД') + 1:]
+            elif 'УВД' in w:
+                w = w[w.index('УВД') + 1:]
+            elif 'ФМС' in w:
+                w = w[w.index('ФМС') + 1:]
+            w = list(filter(None, map(self.filter_city, w)))
+            if len(w) == 0:
+                return None
+            for prob_city in prob_cities:
+                #for word in list(self.codes.values()):
+                for corr_word in w:
+                    rate = lv.jaro(prob_city, corr_word)
+                    if rate > max_rate and (max(len(prob_city), len(corr_word)) / min(len(prob_city), len(corr_word))) < 1.5:
+                        max_word = prob_city
+                        max_rate = rate
+                        print('max_word_city: ', prob_city, corr_word)
+        else:
+            for prob_city in prob_cities:
+                for word in list(self.codes.values()):
+                    w = word[0].split(' ')
+                    if 'ПО' in w:
+                        w = w[w.index('ПО') + 1:]
+                    elif 'МВД' in w:
+                        w = w[w.index('МВД') + 1:]
+                    elif 'ОВД' in w:
+                        w = w[w.index('ОВД') + 1:]
+                    elif 'РОВД' in w:
+                        w = w[w.index('РОВД') + 1:]
+                    elif 'ОМВД' in w:
+                        w = w[w.index('ОМВД') + 1:]
+                    elif 'УВД' in w:
+                        w = w[w.index('УВД') + 1:]
+                    elif 'ФМС' in w:
+                        w = w[w.index('ФМС') + 1:]
+                    w = list(filter(None, map(self.filter_city, w)))
+                    if len(w) == 0:
+                        continue
+                    for corr_word in w:
+                        rate = lv.jaro(prob_city, corr_word)
+                        if rate > max_rate and (max(len(prob_city), len(corr_word)) / min(len(prob_city), len(corr_word))) < 1.5:
+                            max_word = prob_city
+                            max_rate = rate
+                            print('max_word_city: ', prob_city, corr_word)
+        if max_rate <= 0.5:
+            return None
+        else:
+            return max_word
+
+
+
     def __right_check(self, text, data, flag=0):
-        max_rate = lv.jaro(text, data[0])
+        if text.lower() == 'имя' or text.lower() == 'код':
+            return ('', 0)
+
+        city_flag = False
+        if np.array_equal(data, self.arr_name):
+            city_flag = True
+            w = data[0].split(' ')
+            max_rate = lv.jaro(text, w[1])
+            if w[0] == 'гор.':
+                max_rate += 0.2*max_rate
+        else:
+            max_rate = lv.jaro(text, data[0])
+
         corr = data[0]
+
         for ind, word in enumerate(data):
-            rate = lv.jaro(text, word)
-            if rate > max_rate:
+
+            if city_flag:
+                w = word.split(' ')
+                w_copy = w[1]
+                if '-' in w_copy:
+                    w_copy = w_copy.replace('-', '')
+                w_copy = w_copy.lower().capitalize()
+                rate = lv.jaro(text, w_copy)
+                if w[0] == 'гор.':
+                    rate += 0.2*rate
+                word_check = w[1]
+            else:
+                w_copy = word
+                if '-' in w_copy:
+                    w_copy = w_copy.replace('-', '')
+                w_copy = w_copy.lower().capitalize()
+                rate = lv.jaro(text, w_copy)
+                word_check = word
+
+            if rate > max_rate and (max(len(text), len(w_copy)) / min(len(text), len(w_copy))) < 1.5:
                 if flag == 0:
                     if self.priority[ind] > 150:
                         # if word == 'Орест':
@@ -99,12 +205,14 @@ class Search:
                         # if word == 'Сергей':
                         #    print('rate ', rate, 'dist: ', lv.distance(text, word), 'ratio:', lv.ratio(text, word))
                         max_rate = rate
-                        corr = word
-                        print('corr:', corr, text)
+                        corr = word_check
+                        # Печатать правильно подобранное слово
+                        #print('corr:', corr, text)
                 else:
                     max_rate = rate
-                    corr = word
-                    print('corr:', corr, text)
+                    corr = word_check
+                    # Печатать правильно подобранное слово
+                    #print('corr:', corr, text)
         return (corr, max_rate)
 
     def __check__(self, text, param):  # lv.ratio - compute similarity of two strings
@@ -197,9 +305,43 @@ class Search:
                     # for j in del_symbs+alpha:
                     #    word = word.replace(j, '')
                     digit = digit[0:3] + '-' + digit[3:6]
-                    print("possible fms: ", self.codes[digit])
-                    self.possible_fms = self.codes[digit]
-                    return (ind, digit, self.codes[digit][0], all_digits[0])
+                    code_digit = digit
+
+                    try:
+                        print("possible fms: ", self.codes[code_digit])
+                        self.possible_fms = self.codes[code_digit]
+                    except:
+                        return (ind, code_digit, None, None)
+
+                    if '.' in s1[ind+1]:
+                        digit = ''
+                        digit_count = 0
+                        char_count = 0
+                        del_symbs = []
+                        alpha = []
+                        for k in s1[ind+1]:
+                            if k.isdigit():
+                                digit_count += 1
+                                digit += k
+                            elif k.isalpha():
+                                char_count += 1
+                                alpha.append(k)
+                            else:
+                                if k != '-' and k != '.':
+                                    del_symbs.append(k)
+                        if digit_count > char_count:
+                            if digit_count >= 6:
+                                # for j in del_symbs + alpha:
+                                #    digit = digit.replace(j, '')
+                                if len(word) < 8:
+                                    digit = digit + '0' * (8 - len(digit))
+                                elif len(digit) > 8:
+                                    digit = digit[0:8]
+                                digit = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]
+                                all_digits[0] = digit
+                                ind+=1
+
+                    return (ind, code_digit, self.codes[code_digit][0], all_digits[0])
             else:
                 if digit_count > char_count:
                     if digit_count >= 6:
@@ -220,6 +362,8 @@ class Search:
 
     def cpr_spec(self, s1):
         print("After adding: ", s1)
+        if self.possible_fms == None:
+            return None
         ratio = [0] * len(self.possible_fms)
         for i in range(len(self.possible_fms)):
             cp = self.possible_fms[i].split(' ')[0:4]
@@ -263,9 +407,15 @@ class Search:
                 word = word.replace(',', '')
                 word = word.replace(':', '')
                 all_words.append(word.lower().capitalize())"""
-        print('all_digits', all_digits)
+        # print('all_digits', all_digits)
         for digit in all_digits:
             if len(digit) > 6 and '-' not in digit:
+                if digit[0:2] > '31':
+                    digit = "30"+digit[2:len(digit)]
+                if digit[2:4] > "12":
+                    digit = digit[0:2] + "05"+digit[4:len(digit)]
+                if digit[4:8] > "2022":
+                    digit = digit[0:4] + "2022"
                 pers_data["дата выдачи"] = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]
             elif 5 <= len(digit) < 7:
                 if len(digit) > 6:
@@ -290,22 +440,27 @@ class Search:
                 l = len(s1)
             else:
                 j+=1"""
-        print("After adding: ", s1)
-
+        # print("After adding: ", s1)
+        self.data_fms = pers_data['фмс']
+        print('s1:', s1)
         all_digits = []
         all_words = []
-
+        first_ind = 0
+        t1 = time.time()
         for (ind, word) in enumerate(s1):
             digit_count = 0
             digits = ''
             words = ''
             for k in word:
-                print('digit checking:', word)
+                # print('digit checking:', word)
                 if k.isdigit():
+
                     digit_count += 1
                     digits += k
 
             if digit_count > 0:
+                if len(digits) >7:
+                    first_ind = ind
                 all_digits.append(digits)
             else:
                 word = word.replace('.', '')
@@ -314,22 +469,18 @@ class Search:
                 word = word.replace(':', '')
                 all_words.append(word.lower().capitalize())
 
-        spec_word = ''
-        corr_name = ''
-        family = ''
-        surname = ''
-        max_rate = 0
-        ind_name = 0
 
-        rate_fam = 0
-        rate_sur = 0
+        # spec_word = ''
+        corr_name, family, surname, prev_word = '', '', '', ''
+        max_rate, ind_name = 0, 0
+        rate_fam, rate_sur = 0, 0
+        ind_sur, ind_fam, fl = 0, 0, 0
 
-        ind_sur = 0
-        ind_fam = 0
-        #Доработать
-        prev_word = ''
-        fl = 0
-        for (ind, word) in enumerate(all_words):
+
+        # Поиск имени и отчества
+
+        for (ind, word) in enumerate(all_words[:first_ind]):
+
             word2, rate = self.__right_check(word, self.names, flag=0)
             if rate > max_rate:
                 max_rate = rate
@@ -337,9 +488,9 @@ class Search:
                 prev_word = word
                 ind_name = ind
 
-        print("Chosen name: ", corr_name)
-        print(prev_word[-3:].lower())
-        print('ratio вич: ', self.ratio(prev_word[-3:].lower(), 'вич'))
+        # print("Chosen name: ", corr_name)
+        # print(prev_word[-3:].lower())
+        # print('ratio вич: ', self.ratio(prev_word[-3:].lower(), 'вич'))
         if self.ratio(prev_word[-3:].lower(), 'вич') > 0.6:
             corr_name, ratio = self.__right_check(prev_word, self.surnames, flag=0)
             pers_data['отчество'] = corr_name
@@ -352,8 +503,11 @@ class Search:
         #print("Correct_name: ", corr_name, max_rate)
         #pers_data['имя'] = corr_name
 
+        # Поиск фамилии и отчества, если найдено имя
+
         if fl == 0:
-            for i in range(max(0, ind_name - 2), ind_name):
+            for i in range(max(0, ind_name - 3), ind_name):
+
                 fam, rate = self.__right_check(all_words[i], self.families, flag=1)
                 if rate > rate_fam:
                     rate_fam = rate
@@ -361,15 +515,19 @@ class Search:
                     ind_fam = i
             pers_data['фамилия'] = family
 
-            for i in range(ind_name + 1, min(ind_name + 3, len(all_words))):
+            for i in range(ind_name + 1, min(ind_name + 3, first_ind)):
+
                 sur, rate = self.__right_check(all_words[i], self.surnames, flag=0)
                 if rate > rate_sur:
                     rate_sur = rate
                     surname = sur
                     ind_sur = i
             pers_data['отчество'] = surname
+
+            # Поиск фамилии и имени, если найдено отчество
         else:
-            for i in range(max(0, ind_sur - 2), ind_sur):
+            for i in range(max(0, ind_sur - 3), ind_sur):
+
                 fam, rate = self.__right_check(all_words[i], self.families, flag=1)
                 if rate > rate_fam:
                     rate_fam = rate
@@ -383,6 +541,7 @@ class Search:
             if ind_fam == ind_sur-1:
                 t = 1
             for i in range(max(0, ind_sur - 4), ind_sur-t):
+
                 word, rate = self.__right_check(all_words[i], self.names, flag=0)
                 if rate > max_rate:
                     max_rate = rate
@@ -390,29 +549,86 @@ class Search:
                     ind_name = i
             pers_data['имя'] = corr_name
 
+        print("surname: ", all_words[ind_sur])
+
+        ind_sur= s1.index(all_words[ind_sur].upper())
+        city_word = s1[first_ind+1:]
+
         self.delete_multiple_element(all_words, [ind_name, ind_fam, ind_sur])
 
-        max_rate_city = 0
-        max_rate_reg = 0
-        corr_city = ''
-        ind_city = 0
-        corr_region = ''
-        ind_reg = 0
+        max_rate_city, max_rate_reg, date_digit = 0,0,0
+        corr_city, corr_region = '', ''
+        print("Time for finding name and surname in BD is ", time.time()-t1)
 
-        for (ind, word) in enumerate(all_words):
-            word, rate = self.__right_check(word, self.arr_name, flag=1)
+        # Поиск даты рождения среди всех чисел
+        for digit in all_digits:
+            if len(digit) > 6 and '-' not in digit:
+                if digit[0:2] > '31':
+                    date_digit = digit[0:2]+'.'
+                    digit = "30"+digit[2:len(digit)]
+                if digit[2:4] > "12":
+                    date_digit += digit[2:4]+'.'
+                    digit = digit[0:2] + "05"+digit[4:len(digit)]
+                if digit[4:8] > "2022":
+                    date_digit += digit[4:8]
+                    digit = digit[0:4] + "2012"
+                pers_data["дата рождения"] = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]
+            elif 5 <= len(digit) < 7:
+                if len(digit) > 6:
+                    digit = digit[:6]
+                elif len(digit) < 6:
+                    digit += '0' * (6 - len(digit))
+                # code = digit[0:3]+'-'+digit[3:6]
+                # pers_data['Код подразделения'] = code
+                # pers_data['фмс'] = self.codes[code]
+            else:
+                pass
+
+        pers_data['пол'] = 'муж'
+
+        # Поиск города и региона рождения
+        ind_dig = 0
+        print('city_word_testing: ', city_word)
+        print('s1 testing: ',s1)
+        print('pers_data: ', pers_data["дата рождения"])
+        #if date_digit in all_words:
+        #    ind_dig = all_words.index(date_digit)
+
+        print('All words: ', all_words)
+        print('date digit: ', date_digit)
+        print('Probable city place: ', all_words[ind_dig:])
+        print('cities: ', self.arr_name)
+        cities = []
+        for (ind, word) in enumerate(city_word):
+            #if '.' in
+            for symb in '.,:- ':
+                if symb in word:
+                    word = word.replace(symb, '')
+            word = word.lower().capitalize()
+            word1 = word
+            word_corr, rate = self.__right_check(word, self.arr_name, flag=1)
             if rate > max_rate_city:
+                print('City: ', word, 'corr word: ', word_corr)
                 max_rate_city = rate
-                corr_city = word
+                corr_city = word_corr
+                cities.append(corr_city)
                 ind_city = ind
-            word, rate = self.__right_check(word, self.arr_region, flag=1)
-            if rate > max_rate_reg:
-                max_rate_reg = rate
-                corr_region = word
-                ind_reg = ind
-        print("Correct_city: ", corr_city, max_rate_city)
-        print("Correct_region: ", corr_region, max_rate_reg)
-        pers_data['место'] = corr_city + ' ' + corr_region
+            #word_corr, rate = self.__right_check(word1, self.arr_region, flag=1)
+            #if rate > max_rate_reg:
+            #    print('Region: ', word1, 'corr word: ', word_corr)
+            #    max_rate_reg = rate
+            #    corr_region = word_corr
+            #    ind_reg = ind
+        # print("Correct_city: ", corr_city, max_rate_city)
+        # print("Correct_region: ", corr_region, max_rate_reg)
+        #if max_rate_reg < 0.6:
+        #    corr_region = '-'
+        city = self.city_comparing(cities, pers_data['фмс'])
+        if city != None:
+            corr_city = city
+        if max_rate_city < 0.6:
+            corr_city = '-'
+        pers_data['место'] = corr_city #+ ' ' + corr_region
 
         """for (ind_spec, spec) in enumerate(self.special_words):
             max_ratio = 0
@@ -508,12 +724,17 @@ class Search:
                         if lv.distance(right_word, 'муж.') <= 2:
                             s1[ind+1] = 'муж.'
         """
-        pers_data['пол'] = 'муж'
-        print('all_digits', all_digits)
-        for digit in all_digits:
+        # print('all_digits', all_digits)
+        """for digit in all_digits:
             if len(digit) > 6 and '-' not in digit:
-                pers_data["дата рождения"] = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]
-                """for dig in all_digits:
+                if digit[0:2] > '31':
+                    digit = "30"+digit[2:len(digit)]
+                if digit[2:4] > "12":
+                    digit = digit[0:2] + "05"+digit[4:len(digit)]
+                if digit[4:8] > "2022":
+                    digit = digit[0:4] + "2012"
+                pers_data["дата рождения"] = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]"""
+        """for dig in all_digits:
                     if len(dig) >6 and '-' not in dig and dig != digit:
 
                         if len(digit)> 8:
@@ -537,7 +758,7 @@ class Search:
                         pers_data["дата выдачи"] = d2[0:2]+'.'+d2[2:4]+'.'+d2[4:8]
 
                         break"""
-            elif 5 <= len(digit) < 7:
+        """elif 5 <= len(digit) < 7:
                 if len(digit) > 6:
                     digit = digit[:6]
                 elif len(digit) < 6:
@@ -546,10 +767,10 @@ class Search:
                 # pers_data['Код подразделения'] = code
                 # pers_data['фмс'] = self.codes[code]
             else:
-                pass
+                pass"""
                 # pers_data['фмс'] += digit
 
-            """elif 'код' in s1[ind].lower():
+        """elif 'код' in s1[ind].lower():
                 for k in range(ind-4, ind+4):
                     if s1[k][0].isdigit() and '-' in s1[k]:
                         self.person_data['код'] = s1[k]
@@ -563,7 +784,7 @@ class Search:
         return pers_data
 
     def median(self, sequence):
-        return lv.median(sequence)
+        return lv.quickmedian(sequence)
 
     def median_improve(self, word, sequence):
         return lv.median_improve(word, sequence)
@@ -581,6 +802,9 @@ class Search:
         s = SequenceMatcher(None, s1, s2)
         # return s.ratio()
         return lv.ratio(s1, s2)
+
+    def opcodes(self, s1, s2):
+        return len(lv.opcodes(s1, s2))
 
     def look_name(self, name):
         return self.__check__(name, self.names)

@@ -366,11 +366,13 @@ class New_Rotate(Update):
         original = orig_image.copy()
         rect, flag = self.find_biggest_rect(orig_image)
 
+        flag = key
         #degree = self.find_degree(rect, flag)
         degree = self.try_find_new_degree(rect, flag)
         print("degree: ", degree)
         #angle = self.skew_correction(red_modified)
         #cropped_rotated = imutils.rotate_bound(original, degree)
+        original = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
         cropped_rotated = self.cropped_rotated_image(original, degree)
         #rotated = self.rotate_image_true(orig_image, degree)
         show_img(cropped_rotated, 'Cropped and Rotated')
@@ -836,13 +838,14 @@ class RotateImage(FindCountours):
 def show_img(img, title):
     # print(img.shape)
     # print(img)
-    """try:
-        plt.imshow(img)
-        plt.title(title)
-        plt.show()
-    except ValueError:
+
+    #try:
+    #    plt.imshow(img)
+    #    plt.title(title)
+    #    plt.show()
+    #except ValueError:
         pass
-        """
+
 
 a = '''
 def rotate_image(image, angle):

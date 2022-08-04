@@ -61,33 +61,33 @@ class Passport1:
 
         for degree in [0, 90, 180, 270]:
             rotatedImage = imutils.rotate_bound(resizedImage, degree)
-            if (self.isRightOrientation(rotatedImage)):
-                return imutils.rotate_bound(origImage, degree)
+            if (Passport1.isRightOrientation(self, rotatedImage)):
+                return (imutils.rotate_bound(origImage, degree), True)
 
-        return None
+        return (None, None)
 
     # Правильная ли ориентация у изображения.
     # Основываемся на красной линии посередине паспорта и рамки для фото.
     def isRightOrientation(self, image):
-        lineSeparatorInfo = self.getLineSeparatorInfo(image)
+        lineSeparatorInfo = Passport1.getLineSeparatorInfo(self, image)
         if (lineSeparatorInfo is None):
             return False
-
+        print("OK11")
         lineSeparatorRatio = lineSeparatorInfo['w'] / float(lineSeparatorInfo['h'])
-        if (lineSeparatorRatio < self.LINE_SEPARATOR_MIN_RATIO):
+        if (lineSeparatorRatio < Passport1.LINE_SEPARATOR_MIN_RATIO):
             return False
-
-        photoInfo = self.getPhotoInfo(image)
+        print("OK2")
+        photoInfo = Passport1.getPhotoInfo(self, image)
         if (photoInfo is None):
             return False
-
+        print("OK3")
         # Рамка для фото должна быть ниже красной линии.
         return True if photoInfo['minY'] > lineSeparatorInfo['y'] else False
 
     # Нахождение красной линии посередине паспорта.
     # Если линия найдена, возвращается информация о ней в виде {x,y,w,h}, иначе None.
     def getLineSeparatorInfo(self, resizedImage):
-        redImage = self.getRedImage(resizedImage)
+        redImage = Passport1.getRedImage(self, resizedImage)
 
         widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 2))
         redModifiedImage = cv2.dilate(redImage, widthKernel)
@@ -111,7 +111,7 @@ class Passport1:
     # Нахождение рамки для фото.
     # Если фото найдено, возвращается информация о ней в виде {minX,maxX,minY,maxY}, иначе None
     def getPhotoInfo(self, resizedImage):
-        redImage = self.getRedImage(resizedImage)
+        redImage = Passport1.getRedImage(self, resizedImage)
 
         squareKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         redModifiedImage = cv2.dilate(redImage, squareKernel)
@@ -131,9 +131,9 @@ class Passport1:
             width = maxInColumns[0][1] - minInColumns[0][1]
             ratio = width / height if width < height else height / width
 
-            if height > self.RESIZED_IMAGE_PHOTO_MIN_HEIGHT and \
-                width > self.RESIZED_IMAGE_PHOTO_MIN_WIDTH and \
-                ratio > self.PHOTO_MIN_RATIO and \
+            if height > Passport1.RESIZED_IMAGE_PHOTO_MIN_HEIGHT and \
+                width > Passport1.RESIZED_IMAGE_PHOTO_MIN_WIDTH and \
+                ratio > Passport1.PHOTO_MIN_RATIO and \
                 width > maxContourWidth:
                     maxContourWidth = width
 
