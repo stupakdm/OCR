@@ -27,17 +27,28 @@ class Search:
         # self.fams_filepath = 'templates/families2.csv'
         curr_dir = 'modify/Image_update/findBD/data/'
         self.df_name = pd.read_csv(f'{curr_dir}Names_and_surnames2.csv', encoding='utf-8')
-        self.names = np.array(self.df_name['name'])
-        self.surnames = np.array(self.df_name['surname'])
-        self.priority = np.array(self.df_name['priority'])
+        self.names_surnames = np.array(self.df_name)
+        self.names_surnames = self.names_surnames[np.where(self.names_surnames[:,2] >150)[0]]
+        #self.names = np.array(self.df_name['name'])
+        #self.surnames = np.array(self.df_name['surname'])
+        #self.priority = np.array(self.df_name['priority'])
 
         self.df_families = pd.read_csv(f'{curr_dir}families3.csv', encoding='utf-8')
         self.families = np.array(self.df_families['family'])
 
         self.df_cities = pd.read_csv(f'{curr_dir}RussianCities.tsv', sep='\t', index_col=False, encoding='utf-8')
+        self.df_places = np.array(self.df_cities[['name', 'region_name']])
+        self.cities = None #self.find_something(self.df_places, 'город')
+        self.derevni = None #self.find_something(self.df_places, 'деревня')
+        self.sela = None #self.find_something(self.df_places, 'село')
+        self.poselki = None# self.find_something(self.df_places, 'посёлок')
+        self.hutor = None #self.find_something(self.df_places, 'хутор')
+        self.find_something(self.df_places, 'city')
+
         arr_name = np.array(self.df_cities['name'])
         arr_region = np.array(self.df_cities['region_name'])
         arr_region = np.unique(arr_region)
+        self.obl, self.krai = self.find_regions(arr_region, self.df_places)
         self.arr_region = np.array(list(map(self.region_filter, arr_region)))
         self.arr_name = np.array(list(filter(self.filter_names, map(self.name_filter, arr_name))))
 
@@ -57,6 +68,77 @@ class Search:
         del self.df_families
         del self.df_name
         del self.df_fms
+
+    def find_something(self, arrays, word, flag= False):
+        array = np.array(['Москва'])
+        self.cities = array.copy()
+        self.derevni = array.copy()
+        self.sela = array.copy()
+        self.poselki = array.copy()
+        self.hutor = array.copy()
+        for i in range(arrays.shape[0]):
+            new_line = arrays[i][0].split(' ')
+            if 'город' in new_line:
+                new_line = list(filter(lambda a: a != 'город', new_line))
+                self.cities = np.append(self.cities, np.array([' '.join(new_line)]), axis = 0)
+            elif 'село' in new_line:
+                new_line = list(filter(lambda a: a != 'село', new_line))
+                self.sela = np.append(self.sela, np.array([' '.join(new_line)]), axis=0)
+            elif 'посёлок' in new_line or 'поселок' in new_line:
+                new_line = list(filter(lambda a: a != 'посёлок', new_line))
+                self.poselki = np.append(self.poselki, np.array([' '.join(new_line)]), axis=0)
+            elif 'деревня' in new_line:
+                new_line = list(filter(lambda a: a != 'деревня', new_line))
+                self.derevni = np.append(self.derevni, np.array([' '.join(new_line)]), axis=0)
+            elif 'хутор' in new_line:
+                new_line = list(filter(lambda a: a != 'хутор', new_line))
+                self.hutor = np.append(self.hutor, np.array([' '.join(new_line)]), axis=0)
+
+            """    new_line = list
+            if word in new_line:
+                self.cities = None  # self.find_something(self.df_places, 'город')
+                self.derevni = None  # self.find_something(self.df_places, 'деревня')
+                self.sela = None  # self.find_something(self.df_places, 'село')
+                self.poselki = None  # self.find_something(self.df_places, 'посёлок')
+                self.hutor
+                new_line = list(filter(lambda a: a != word, new_line))
+                arrays[i][0] = ' '.join(new_line)
+                array = np.append(array, np.array([arrays[i][0]]), axis = 0)"""
+        self.cities = np.delete(self.cities, 0, axis = 0)
+        self.sela = np.delete(self.sela, 0, axis=0)
+        self.derevni = np.delete(self.derevni, 0, axis=0)
+        self.poselki = np.delete(self.poselki, 0, axis=0)
+        self.hutor = np.delete(self.hutor, 0, axis=0)
+        #array = np.delete(array, 0, axis = 0)
+        return array
+
+    def find_regions(self, regions, places):
+        obl = dict()
+        krai = dict()
+        for i in range(len(regions)):
+            reg = regions[i].split(' ')
+            if 'область' in reg:
+                reg = list(filter(lambda a: a!= 'область', reg))
+                reg = ' '.join(reg)
+                all_places = places[np.where(places == regions[i])[0], 0]
+                for j in range(len(all_places)):
+                    place = all_places[j].split(' ')
+                    place = list(filter(self.filter_mesta, place))
+                    place = ' '.join(place)
+                    all_places[j] = place
+                obl[reg] = all_places #places[np.where(places == regions[i])[0], 0]
+            if 'край' in reg:
+                reg = list(filter(lambda a: a != 'край', reg))
+                reg = ' '.join(reg)
+                all_places = places[np.where(places == regions[i])[0], 0]
+                for j in range(len(all_places)):
+                    place = all_places[j].split(' ')
+                    place = list(filter(self.filter_mesta, place))
+                    place = ' '.join(place)
+                    all_places[j] = place
+                krai[reg] = all_places #places[np.where(places == regions[i])[0], 0]
+            #region[regions[i]] = places[np.where(places == regions[i])[0], 0]
+        return obl, krai
 
     def region_filter(self, word):
         w = word.split(' ')
@@ -82,6 +164,13 @@ class Search:
         else:
             f = w[0][0:3] + ''
         return f + '. ' + ' '.join(w[1:])
+
+    def filter_mesta(self, word):
+        word = word.lower()
+        if word == 'город' or word == 'деревня' or word == 'хутор' or word == 'село':
+            return None
+        else:
+            return word
 
     def filter_names(self, word):
         return None if 'і' in word or 'ї' in word else word
@@ -126,7 +215,8 @@ class Search:
                     if rate > max_rate and (max(len(prob_city), len(corr_word)) / min(len(prob_city), len(corr_word))) < 1.5:
                         max_word = prob_city
                         max_rate = rate
-                        print('max_word_city: ', prob_city, corr_word)
+                        self.print('max_word_city', [prob_city, corr_word])
+                        #print('max_word_city: ', prob_city, corr_word)
         else:
             for prob_city in prob_cities:
                 for word in list(self.codes.values()):
@@ -153,7 +243,8 @@ class Search:
                         if rate > max_rate and (max(len(prob_city), len(corr_word)) / min(len(prob_city), len(corr_word))) < 1.5:
                             max_word = prob_city
                             max_rate = rate
-                            print('max_word_city: ', prob_city, corr_word)
+                            self.print('max_word_city', [prob_city, corr_word])
+                            #print('max_word_city: ', prob_city, corr_word)
         if max_rate <= 0.5:
             return None
         else:
@@ -161,16 +252,21 @@ class Search:
 
 
 
-    def __right_check(self, text, data, flag=0):
+    def __right_check(self, text, data, flag=0, places_flag = 0):
         if text.lower() == 'имя' or text.lower() == 'код':
             return ('', 0)
 
+        priority = None
+        if flag == 0:
+            priority = data[:, 1]
+            data = data[:, 0]
+        city_ind = -1
         city_flag = False
-        if np.array_equal(data, self.arr_name):
+        if places_flag>0:
             city_flag = True
-            w = data[0].split(' ')
-            max_rate = lv.jaro(text, w[1])
-            if w[0] == 'гор.':
+            city_ind = 0
+            max_rate = lv.jaro(text, data[0])
+            if places_flag == 1:
                 max_rate += 0.2*max_rate
         else:
             max_rate = lv.jaro(text, data[0])
@@ -180,15 +276,14 @@ class Search:
         for ind, word in enumerate(data):
 
             if city_flag:
-                w = word.split(' ')
-                w_copy = w[1]
-                if '-' in w_copy:
-                    w_copy = w_copy.replace('-', '')
-                w_copy = w_copy.lower().capitalize()
-                rate = lv.jaro(text, w_copy)
-                if w[0] == 'гор.':
+                if '-' in word:
+                    word = word.replace('-', '')
+                word = word.lower().capitalize()
+                w_copy = word
+                rate = lv.jaro(text, word)
+                if places_flag == 1:
                     rate += 0.2*rate
-                word_check = w[1]
+                word_check = word
             else:
                 w_copy = word
                 if '-' in w_copy:
@@ -196,23 +291,24 @@ class Search:
                 w_copy = w_copy.lower().capitalize()
                 rate = lv.jaro(text, w_copy)
                 word_check = word
-
             if rate > max_rate and (max(len(text), len(w_copy)) / min(len(text), len(w_copy))) < 1.5:
                 if flag == 0:
-                    if self.priority[ind] > 150:
-                        # if word == 'Орест':
-                        #    print('rate ', rate, 'dist: ', lv.distance(text, word), 'ratio:', lv.ratio(text, word))
+                    if priority[ind] > 250: #and rate>0.7:
                         # if word == 'Сергей':
                         #    print('rate ', rate, 'dist: ', lv.distance(text, word), 'ratio:', lv.ratio(text, word))
                         max_rate = rate
                         corr = word_check
                         # Печатать правильно подобранное слово
                         #print('corr:', corr, text)
+                    #if 150<priority[ind]<250 and rate
                 else:
+                    city_ind = ind
                     max_rate = rate
                     corr = word_check
                     # Печатать правильно подобранное слово
                     #print('corr:', corr, text)
+        if city_flag:
+            return (corr, max_rate, city_ind)
         return (corr, max_rate)
 
     def __check__(self, text, param):  # lv.ratio - compute similarity of two strings
@@ -261,10 +357,19 @@ class Search:
             pers_data[spec] = name_r
         return pers_data
 
+    def delete_symbs(self, s1):
+        new_s1 = []
+        for i in range(len(s1)):
+            if s1[i] in s1[:i]+s1[i+1:] and (len(s1[i]) == 2 or len(s1[i]) > 5):
+                new_s1.append(s1[i])
+        return new_s1
+
     def series_number(self, s1, pers_data):
         series = ''
         number = ''
-        print(s1)
+        self.print('s1', s1)
+        s1 = self.delete_symbs(s1)
+        #print(s1)
         for (ind, word) in enumerate(s1):
             if len(word) == 2 and word not in series:
                 if ind != 0 and ind != len(s1) - 1:
@@ -272,7 +377,7 @@ class Search:
                         series += word
             if len(word) >= 5 and word not in number:
                 number += word
-        pers_data['серия'] = series[2:] + series[0:2]
+        pers_data['серия'] = series[2:] + series[:2]
         pers_data['номер'] = number
         return pers_data
 
@@ -283,7 +388,9 @@ class Search:
                 list_object.pop(idx)
 
     def find_code_ind(self, s1):
+        self.possible_fms = None
         all_digits = [None]
+        s1.append('')
         for (ind, word) in enumerate(s1):
             digit = ''
             digit_count = 0
@@ -308,8 +415,14 @@ class Search:
                     code_digit = digit
 
                     try:
-                        print("possible fms: ", self.codes[code_digit])
-                        self.possible_fms = self.codes[code_digit]
+                        self.print('possible fms', self.codes[code_digit])
+                        #print("possible fms: ", self.codes[code_digit])
+                        if len(self.codes[code_digit])>1 and len(self.codes[code_digit])<3:
+                            self.possible_fms = self.codes[code_digit][0:2]
+                        if len(self.codes[code_digit]) > 2:
+                            self.possible_fms = self.codes[code_digit][0:3]
+                        else:
+                            self.possible_fms = self.codes[code_digit]
                     except:
                         return (ind, code_digit, None, None)
 
@@ -340,8 +453,13 @@ class Search:
                                 digit = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]
                                 all_digits[0] = digit
                                 ind+=1
-
-                    return (ind, code_digit, self.codes[code_digit][0], all_digits[0])
+                    if len(self.codes[code_digit]) > 1 and len(self.codes[code_digit]) < 3:
+                        self.possible_fms = self.codes[code_digit][0:2]
+                    if len(self.codes[code_digit]) > 2:
+                        self.possible_fms = self.codes[code_digit][0:3]
+                    if len(self.codes[code_digit]) == 1:
+                        self.possible_fms = self.codes[code_digit]
+                    return (ind, code_digit, self.possible_fms, all_digits[0])
             else:
                 if digit_count > char_count:
                     if digit_count >= 6:
@@ -361,9 +479,11 @@ class Search:
         input()"""
 
     def cpr_spec(self, s1):
-        print("After adding: ", s1)
+        self.print('After adding', s1)
+        #print("After adding: ", s1)
         if self.possible_fms == None:
             return None
+
         ratio = [0] * len(self.possible_fms)
         for i in range(len(self.possible_fms)):
             cp = self.possible_fms[i].split(' ')[0:4]
@@ -378,13 +498,24 @@ class Search:
                         rat = r
                 del cp[ind_max]
                 ratio[i] += rat
-        m = max(ratio)
+            self.possible_fms[i] = [self.possible_fms[i], ratio[i]]
+
+        self.possible_fms = sorted(self.possible_fms, key=lambda x: -x[1])
+        for i in range(len(self.possible_fms)):
+            self.possible_fms[i] = self.possible_fms[i][0]
+        return self.possible_fms
+        '''m = max(ratio)
         for i, val in enumerate(ratio):
             if m == val:
-                return self.possible_fms[i]
+                possible_fms = [self.possible_fms[i]]
+                del self.possible_fms[i]
+                self.possible_fms = possible_fms+self.possible_fms
+                n = min(3, len(self.possible_fms))
+                return self.possible_fms[:n]'''
 
     def cpr_spec_fms(self, s1, pers_data):
-        print("After adding: ", s1)
+        #self.print('After adding', s1)
+        #print("After adding: ", s1)
 
         all_digits = []
         # all_words = []
@@ -393,7 +524,8 @@ class Search:
             digits = ''
             # words = ''
             for k in word:
-                print('digit checking:', word)
+                #self.print('digit checking', word)
+                #print('digit checking:', word)
                 if k.isdigit():
                     digit_count += 1
                     digits += k
@@ -424,13 +556,250 @@ class Search:
                     digit += '0' * (6 - len(digit))
                 code = digit[0:3] + '-' + digit[3:6]
                 pers_data['Код подразделения'] = code
+                #print('ФМС: ', self.codes[code])
                 pers_data['фмс'] = self.codes[code]
             else:
                 pass
 
         return pers_data
 
+
+    def cpr_fio(self, words, dicts, ind):
+        arr = []
+        flag = 1
+        #priority = dicts[:,1].copy()
+        #dicts = dicts[:,0].copy()
+        if ind == 1 or ind == 2:
+            flag = 0
+        for z in range(3):
+            word2, rate = self.__right_check(words[ind], dicts, flag=flag)
+            arr.append([word2, words[ind], ind, rate])
+            #if ind == 1:
+                #priority = priority[np.where(dicts != word2)]
+            if ind != 0:
+                dicts = dicts[np.where(dicts[:,0] != word2)[0]]
+            else:
+                dicts = dicts[np.where(dicts != word2)]
+            #temp_arr = np.array([word2])
+            #dicts = np.setdiff1d(dicts, temp_arr)
+        three_arrs = self.sort_data(arr)
+        return three_arrs
+
+    def cpr_obls(self, word, data, len_places, places_flag):
+        places = []
+        obl_flag = True
+        for z in range(3):
+            word_corr, rate, city_ind = self.__right_check(word, data, flag=1, places_flag=places_flag)
+            while [word_corr, word, True, rate] in places or [word_corr, word, False, rate] in places:
+                if city_ind > len_places[0]:
+                    len_places[1] -=1
+                else:
+                    len_places[0] -= 1
+                data = np.delete(data, city_ind, axis=0)
+                word_corr, rate, city_ind = self.__right_check(word, data, flag=1, places_flag=places_flag)
+            if city_ind > len_places[0]:
+                obl_flag = False
+            places.append([word_corr, word, obl_flag, rate])
+            obl_flag = True
+        three_cities = self.sort_data(places)
+        places.clear()
+        return three_cities
+
+    def cpr_cities(self, word, data, places_flag):
+        cities = []
+        for z in range(3):
+            word_corr, rate, city_ind = self.__right_check(word, data, flag=1, places_flag=places_flag)
+            while [word_corr, word, 0, rate] in cities:
+                data = np.delete(data, city_ind, axis=0)
+                word_corr, rate, city_ind = self.__right_check(word, data, flag=1, places_flag=places_flag)
+            cities.append([word_corr, word, 0, rate])
+        three_cities = self.sort_data(cities)
+        cities.clear()
+        return three_cities
+
     def cpr_spec_words(self, s1, pers_data):
+        self.data_fms = pers_data['фмс']
+        self.print('s1', s1)
+        # print('s1:', s1)
+        all_digits = []
+        t1 = time.time()
+
+        all_words = [word.lower().capitalize() for word in s1]
+
+        three_names = self.cpr_fio(all_words, self.names_surnames[:, [0,2]].copy(), 1)
+
+        three_families = self.cpr_fio(all_words, self.families.copy(), 0)
+
+        three_surnames = self.cpr_fio(all_words, self.names_surnames[:, [1, 2]].copy(), 2)
+        all_words = all_words[3:]
+        new_words = []
+        first_ind = -1
+        for (ind, word) in enumerate(all_words):
+            digit_count = 0
+            digits = ''
+            for k in word:
+                if k.isdigit():
+                    digit_count += 1
+                    digits += k
+
+            if digit_count > 0:
+                if len(digits) > 7:
+                    first_ind = ind
+                all_digits.append(digits)
+            else:
+                #if first_ind != -1:
+                new_words.append(word)
+        all_words = new_words
+        for digit in all_digits:
+            if len(digit) > 6 and '-' not in digit:
+                if digit[0:2] > '31':
+                    digit = "30"+digit[2:len(digit)]
+                if digit[2:4] > "12":
+                    digit = digit[0:2] + "05"+digit[4:len(digit)]
+                year = digit[4:8]
+                fl = False
+                if int(year) > 2006:
+                    for j in range(1, len(year)):
+                        for d in range(int(year[j]), -1 , -1):
+                            year1 = int(year[0:j]+str(d)+year[j+1:])
+                            if year1 >=1950 and year1 <= 2006:
+                                year = str(year1)
+                                fl = True
+                                break
+                        if fl:
+                            break
+                        year = year[0:j] + '0' + year[j + 1:]
+
+                elif int(year) < 1950:
+                    for j in range(1, len(year)):
+                        for d in range(int(year[j]), 10):
+                            year1 = int(year[0:j] + str(d) + year[j + 1:])
+                            if year1 >= 1950 and year1 <= 2006:
+                                year = str(year1)
+                                fl = True
+                                break
+                        if fl:
+                            break
+                        year = year[0:j] + '9' + year[j + 1:]
+                pers_data["дата рождения"] = digit[0:2] + '.' + digit[2:4] + '.' + year
+            elif 5 <= len(digit) < 7:
+                if len(digit) > 6:
+                    digit = digit[:6]
+                elif len(digit) < 6:
+                    digit += '0' * (6 - len(digit))
+            else:
+                pass
+
+        pers_data['пол'] = 'муж'
+        pers_data['фамилия'] = three_families
+        pers_data['имя'] = three_names
+        pers_data['отчество'] = three_surnames
+
+        cities = []
+        three_cities = None
+        three_obls = None
+        three_krai = None
+        if len(all_words) == 1:
+            if ' ' not in all_words[0]:
+                three_cities = self.cpr_cities(all_words[0], self.cities.copy(), places_flag = 1)
+                """for z in range(3):
+                    word_corr, rate, city_ind = self.__right_check(all_words[0], self.cities[:, 0], flag=1, places_flag = 1)
+                    while [word_corr, all_words[0], 0, rate] in cities:
+                        self.cities = np.delete(self.cities, city_ind, axis = 0)
+                        word_corr, rate, city_ind = self.__right_check(all_words[0], self.cities[:, 0], flag=1, places_flag = 1)
+                    cities.append([word_corr, all_words[0], 0, rate])
+                three_cities = self.sort_data(cities)
+                cities.clear()"""
+            else:
+                all_words = all_words[0].split(' ')
+        three_places = None
+        if len(all_words) != 1:
+            for i in range(len(all_words)-1, -1 , -1):
+                word = all_words[i].lower()
+                rate_krai = lv.ratio(word, 'край')
+                if rate_krai > 0.8:
+                    krais = list(self.krai.keys())
+                    three_krai = self.cpr_obls(all_words[i-1], list(self.krai.keys()).copy(), [0, len(krais)], places_flag=2)
+
+                rate_obl = max(lv.ratio(word, 'обл.'), lv.ratio(word, 'область'))
+                if rate_obl > 0.8:
+                    obls = list(self.obl.keys())
+                    three_obls = self.cpr_obls(all_words[i-1], list(self.obl.keys()).copy(), [len(obls), 0], places_flag=3)
+
+
+                rate_city = max(lv.ratio(word, 'город'), lv.ratio(word, 'гор.'))
+                if rate_city > 0.8:
+                    three_cities = self.cpr_cities(all_words[i+1], self.cities.copy(), places_flag=1)
+
+                rate_der = max(lv.ratio(word, 'деревня'), lv.ratio(word, 'дер.'))
+                if rate_der > 0.8:
+                    pass
+                rate_selo = max(lv.ratio(word, 'село'), lv.ratio(word, 'с.'))
+                if rate_selo > 0.8:
+                    pass
+                rate_posel = max(lv.ratio(word, 'посёлок'), lv.ratio(word, 'пос.'))
+                if rate_posel > 0.8:
+                    pass
+                rate_hutor = max(lv.ratio(word, 'хутор'), lv.ratio(word, 'хут.'))
+                if rate_hutor > 0.8:
+                    pass
+
+            if three_cities == None:
+                new_list_cities = np.array([None])
+                if three_obls == None and three_krai == None:
+                    for i in range(len(all_words)-1 , 0, -1):
+                        all_obls = list(self.obl.keys())+list(self.krai.keys())
+                        len_obls = [len(list(self.obl.keys())), len(list(self.krai.keys()))]
+                        three_new_places = self.cpr_obls(all_words[i], all_obls.copy(), len_obls, places_flag=2)
+                        if three_places == None:
+                            three_places = three_new_places
+                        else:
+                            three_places = three_places + three_new_places
+                            three_places.sort(key=lambda x: x[3])
+                            three_places.reverse()
+                            three_places = three_places[:3]
+
+                        for w in three_places:
+                            if w[2] == True:
+                                self.obl[w[0]] = self.obl[w[0]].reshape(self.obl[w[0]].shape[0], 1)
+                                new_list_cities = np.append(new_list_cities, self.obl[w[0]])
+                            else:
+                                self.krai[w[0]] = self.krai[w[0]].reshape(self.krai[w[0]].shape[0], 1)
+                                new_list_cities = np.append(new_list_cities, self.krai[w[0]])
+                        new_list_cities = np.delete(new_list_cities, 0)
+                    #three_cities = self.cpr_cities(all_words[0], new_list_cities.copy(), places_flag=1)
+                elif three_obls != None:
+                    for w in three_obls:
+                        if w[2] == True:
+                            self.obl[w[0]] = self.obl[w[0]].reshape(self.obl[w[0]].shape[0], 1)
+                            new_list_cities = np.append(new_list_cities, self.obl[w[0]])
+                        else:
+                            self.krai[w[0]] = self.krai[w[0]].reshape(self.krai[w[0]].shape[0], 1)
+                            new_list_cities = np.append(new_list_cities, self.krai[w[0]])
+                    new_list_cities = np.delete(new_list_cities, 0)
+                    three_places = three_obls
+                elif three_krai != None:
+                    for w in three_krai:
+                        if w[2] == True:
+                            self.obl[w[0]] = self.obl[w[0]].reshape(self.obl[w[0]].shape[0], 1)
+                            new_list_cities = np.append(new_list_cities, self.obl[w[0]])
+                        else:
+                            self.krai[w[0]] = self.krai[w[0]].reshape(self.krai[w[0]].shape[0], 1)
+                            new_list_cities = np.append(new_list_cities, self.krai[w[0]])
+                    new_list_cities = np.delete(new_list_cities, 0)
+                    three_places = three_krai
+                three_cities = self.cpr_cities(all_words[0], new_list_cities.copy(), places_flag=1)
+
+                # Доделать для областей и краев
+                #nas_
+
+        if three_places == None:
+            pers_data['место'] = three_cities
+        else:
+            pers_data['место'] = three_cities+three_places
+        return pers_data
+
+    def cpr_spec_words1(self, s1, pers_data):
         """j = 0
         l = len(s1)
         while j<l:
@@ -442,11 +811,59 @@ class Search:
                 j+=1"""
         # print("After adding: ", s1)
         self.data_fms = pers_data['фмс']
-        print('s1:', s1)
+        self.print('s1', s1)
+        #print('s1:', s1)
         all_digits = []
         all_words = []
         first_ind = 0
         t1 = time.time()
+
+        all_words = [word.lower().capitalize() for word in s1]
+        names = []
+        for z in range(3):
+            word2, rate = self.__right_check(all_words[1], self.names, flag=0)
+            names.append([word2, all_words[1], 1, rate])
+            temp_arr = np.array([word2])
+            self.names = np.setdiff1d(self.names, temp_arr)
+        three_names = self.sort_data(names)
+        names.clear()
+
+        families = []
+        for z in range(3):
+            fam, rate = self.__right_check(all_words[0], self.families, flag=1)
+            families.append([fam, all_words[0], 0, rate])
+            temp_arr = np.array([fam])
+            self.families = np.setdiff1d(self.families, temp_arr)
+        three_families = self.sort_data(families)
+        families.clear()
+
+        surnames = []
+        for z in range(3):
+            sur, rate = self.__right_check(all_words[2], self.surnames, flag=0)
+            surnames.append([sur, all_words[2], 2, rate])
+            temp_arr = np.array([sur])
+            self.surnames = np.setdiff1d(self.surnames, temp_arr)
+        three_surnames = self.sort_data(surnames)
+        surnames.clear()
+
+        all_words = all_words[3:]
+        for (ind, word) in enumerate(all_words):
+            digit_count = 0
+            digits = ''
+            for k in word:
+                # print('digit checking:', word)
+                if k.isdigit():
+
+                    digit_count += 1
+                    digits += k
+
+            if digit_count > 0:
+                if len(digits) > 7:
+                    first_ind = ind
+                all_digits.append(digits)
+                all_words = all_words[first_ind+1:]
+                break
+
         for (ind, word) in enumerate(s1):
             digit_count = 0
             digits = ''
@@ -476,85 +893,177 @@ class Search:
         rate_fam, rate_sur = 0, 0
         ind_sur, ind_fam, fl = 0, 0, 0
 
-
         # Поиск имени и отчества
+        three_names = [[None, None, -1] for i in range(3)]
+        three_surnames = three_names.copy()
+        three_cities = three_names.copy()
+        three_families = three_names.copy()
 
+        names = []
+        nams = self.names.copy()
+        if first_ind != 0:
+            first_ind = max(first_ind, 1)
+        else:
+            first_ind = len(s1)
         for (ind, word) in enumerate(all_words[:first_ind]):
+            self.names = nams.copy()
+            for z in range(3):
+                word2, rate = self.__right_check(word, self.names, flag=0)
+                names.append([word2, word, ind, rate])
+                temp_arr = np.array([word2])
+                self.names = np.setdiff1d(self.names, temp_arr)
+        self.names = nams.copy()
+        del nams
 
-            word2, rate = self.__right_check(word, self.names, flag=0)
-            if rate > max_rate:
+
+        #temp_arr = np.array([word2])
+        #self.names = np.setdiff1d(self.names, temp_arr)
+
+        if rate > max_rate:
                 max_rate = rate
                 corr_name = word2
+                three_names[2] = three_names[1]
+                three_names[1] = three_names[0]
+                three_names[0] = [corr_name, word, ind]
                 prev_word = word
                 ind_name = ind
-
+        three_names = self.sort_data(names)
+        names.clear()
+        three_surnames = [[None, None, 0] for i in range(3)]
+        three_families = None
         # print("Chosen name: ", corr_name)
         # print(prev_word[-3:].lower())
         # print('ratio вич: ', self.ratio(prev_word[-3:].lower(), 'вич'))
-        if self.ratio(prev_word[-3:].lower(), 'вич') > 0.6:
-            corr_name, ratio = self.__right_check(prev_word, self.surnames, flag=0)
-            pers_data['отчество'] = corr_name
-            ind_sur = ind_name
+        if self.ratio(three_names[0][1][-3:].lower(), 'вич') > 0.6:
+            corr_name, ratio = self.__right_check(three_names[0][1], self.surnames, flag=0)
+            three_names[0] = [None, None,0]
+            three_surnames[0] = [corr_name, three_names[0][1], three_names[0][2]]
+            #pers_data['отчество'] = corr_name
+            #ind_sur = ind_name
             corr_name = ''
             ind_name = 0
             fl = 1
         else:
-            pers_data['имя'] = corr_name
+            pass
+
+                #pers_data['имя'] = corr_name
         #print("Correct_name: ", corr_name, max_rate)
         #pers_data['имя'] = corr_name
 
         # Поиск фамилии и отчества, если найдено имя
+        families = []
+        if three_names[0][0] != None:
+                fams = self.families.copy()
+                '''if three_names[0][2] == 0:
+                    three_names[0][2] = 1'''
+                for i in range(max(0, three_names[0][2] - 3), three_names[0][2]):
+                    self.families = fams.copy()
+                    for z in range(3):
+                        fam, rate = self.__right_check(all_words[i], self.families, flag=1)
+                        families.append([fam, all_words[i], i, rate])
+                        temp_arr = np.array([fam])
+                        self.families = np.setdiff1d(self.families, temp_arr)
+                del fams
+                '''if rate > rate_fam:
+                        rate_fam = rate
+                        three_families[2] = three_families[1]
+                        three_families[1] = three_families[0]
+                        three_families[0] = [fam, all_words[i], ind_fam]
+                        family = fam
+                        ind_fam = i'''
+                three_families = self.sort_data(families)
+                families.clear()
+                #pers_data['фамилия'] = three_families
+                    #pers_data['фамилия'] = family
 
-        if fl == 0:
-            for i in range(max(0, ind_name - 3), ind_name):
+                surnames = []
+                surs = self.surnames.copy()
+                '''if  min(three_names[0][2] + 3, first_ind) == three_names[0][2] + 1:
+                    three_names[0][2] -=1'''
+                for i in range(three_names[0][2] + 1, min(three_names[0][2] + 3, first_ind)):
+                    self.surnames = surs.copy()
+                    for z in range(3):
+                        sur, rate = self.__right_check(all_words[i], self.surnames, flag=0)
+                        surnames.append([sur, all_words[i], i, rate])
+                        temp_arr = np.array([sur])
+                        temp_arr = np.array([sur])
+                        self.surnames = np.setdiff1d(self.surnames, temp_arr)
 
-                fam, rate = self.__right_check(all_words[i], self.families, flag=1)
-                if rate > rate_fam:
-                    rate_fam = rate
-                    family = fam
-                    ind_fam = i
-            pers_data['фамилия'] = family
-
-            for i in range(ind_name + 1, min(ind_name + 3, first_ind)):
-
-                sur, rate = self.__right_check(all_words[i], self.surnames, flag=0)
-                if rate > rate_sur:
+                del surs
+                three_surnames = self.sort_data(surnames)
+                surnames.clear()
+                '''if rate > rate_sur:
                     rate_sur = rate
                     surname = sur
                     ind_sur = i
-            pers_data['отчество'] = surname
-
-            # Поиск фамилии и имени, если найдено отчество
+                pers_data['отчество'] = surname'''
+                #pers_data['отчество'] = three_surnames
+                # Поиск фамилии и имени, если найдено отчество
         else:
-            for i in range(max(0, ind_sur - 3), ind_sur):
+                fams = self.families.copy()
+                '''if three_surnames[0][2] == 0:
+                    three_surnames[0][2] = 1'''
+                for i in range(max(0, three_surnames[0][2] - 3), three_surnames[0][2]):
+                    self.families = fams.copy()
+                    for z in range(3):
+                        fam, rate = self.__right_check(all_words[i], self.families, flag=1)
+                        families.append([fam, all_words[i], i, rate])
+                        temp_arr = np.array([fam])
+                        self.families = np.setdiff1d(self.families, temp_arr)
 
-                fam, rate = self.__right_check(all_words[i], self.families, flag=1)
-                if rate > rate_fam:
-                    rate_fam = rate
-                    family = fam
-                    ind_fam = i
-            pers_data['фамилия'] = family
+                del fams
+                three_families = self.sort_data(families)
+                families.clear()
 
-            max_rate = 0
+                '''fam, rate = self.__right_check(all_words[i], self.families, flag=1)
+                    if rate > rate_fam:
+                        rate_fam = rate
+                        family = fam
+                        ind_fam = i
+                pers_data['фамилия'] = family'''
+                #pers_data['фамилия'] = three_families
+                #max_rate = 0
 
-            t = 2
-            if ind_fam == ind_sur-1:
-                t = 1
-            for i in range(max(0, ind_sur - 4), ind_sur-t):
+                t = 2
+                '''if three_families[0][2] == three_surnames[0][2]-1:
+                    t = 0
+                    three_surnames[0][2] = 4'''
+                surs = self.surnames.copy()
+                for i in range(max(0, three_surnames[0][2] - 4), three_surnames[0][2]-t):
+                    self.surnames = surs.copy()
+                    for z in range(3):
+                        word, rate = self.__right_check(all_words[i], self.names, flag=0)
+                        names.append([word, all_words[i], i, rate])
+                        temp_arr = np.array([word])
+                        self.names = np.setdiff1d(self.names, temp_arr)
 
-                word, rate = self.__right_check(all_words[i], self.names, flag=0)
-                if rate > max_rate:
-                    max_rate = rate
-                    corr_name = word
-                    ind_name = i
-            pers_data['имя'] = corr_name
+                del surs
+                three_names = self.sort_data(names)
+                names.clear()
+                '''if rate > max_rate:
+                        max_rate = rate
+                        corr_name = word
+                        ind_name = i
+                pers_data['имя'] = corr_name'''
+                #pers_data['имя'] = three_names
+        #self.print('surname', all_words[ind_sur])
+        #print("surname: ", all_words[ind_sur])
+        three_cities = [[None, None, 0] for i in range(3)]
+        delete_indexes = []
+        for j in range(len(three_surnames)):
+            ind_sur= s1.index(all_words[three_surnames[j][2]].upper())
+            three_surnames[j][2] = ind_sur
+            city_index = ind_sur
+            if first_ind != len(s1)-1:
+                city_index = first_ind
+            three_cities[j][2] = city_index
+            city_word = s1[city_index+1:]
+            three_cities[j][1] = city_word
+            delete_indexes += [three_surnames[j][2], three_names[j][2], three_families[j][2]]
 
-        print("surname: ", all_words[ind_sur])
 
-        ind_sur= s1.index(all_words[ind_sur].upper())
-        city_word = s1[first_ind+1:]
-
-        self.delete_multiple_element(all_words, [ind_name, ind_fam, ind_sur])
+        delete_indexes = list(set(delete_indexes))
+        self.delete_multiple_element(all_words, delete_indexes)
 
         max_rate_city, max_rate_reg, date_digit = 0,0,0
         corr_city, corr_region = '', ''
@@ -569,10 +1078,33 @@ class Search:
                 if digit[2:4] > "12":
                     date_digit += digit[2:4]+'.'
                     digit = digit[0:2] + "05"+digit[4:len(digit)]
-                if digit[4:8] > "2022":
-                    date_digit += digit[4:8]
-                    digit = digit[0:4] + "2012"
-                pers_data["дата рождения"] = digit[0:2] + '.' + digit[2:4] + '.' + digit[4:8]
+                year = digit[4:8]
+                fl = False
+                if int(year) > 2006:
+                    for j in range(1, len(year)):
+                        for d in range(int(year[j]), -1 , -1):
+                            year1 = int(year[0:j]+str(d)+year[j+1:])
+                            if year1 >=1950 and year1 <= 2006:
+                                year = str(year1)
+                                fl = True
+                                break
+                        if fl:
+                            break
+                        year = year[0:j] + '0' + year[j + 1:]
+
+                elif int(year) < 1950:
+                    for j in range(1, len(year)):
+                        for d in range(int(year[j]), 10):
+                            year1 = int(year[0:j] + str(d) + year[j + 1:])
+                            if year1 >= 1950 and year1 <= 2006:
+                                year = str(year1)
+                                fl = True
+                                break
+                        if fl:
+                            break
+                        year = year[0:j] + '9' + year[j + 1:]
+                #date_digit += year
+                pers_data["дата рождения"] = digit[0:2] + '.' + digit[2:4] + '.' + year
             elif 5 <= len(digit) < 7:
                 if len(digit) > 6:
                     digit = digit[:6]
@@ -585,34 +1117,62 @@ class Search:
                 pass
 
         pers_data['пол'] = 'муж'
-
+        pers_data['фамилия'] = three_families
+        pers_data['имя'] = three_names
+        pers_data['отчество'] = three_surnames
         # Поиск города и региона рождения
         ind_dig = 0
-        print('city_word_testing: ', city_word)
-        print('s1 testing: ',s1)
-        print('pers_data: ', pers_data["дата рождения"])
+        #self.print('city_word_testing', city_word)
+        #print('city_word_testing: ', city_word)
+        #self.print('s1 testing', s1)
+        #print('s1 testing: ',s1)
+        #self.print('pers_data', pers_data["дата рождения"])
+        #print('pers_data: ', pers_data["дата рождения"])
         #if date_digit in all_words:
         #    ind_dig = all_words.index(date_digit)
-
-        print('All words: ', all_words)
-        print('date digit: ', date_digit)
-        print('Probable city place: ', all_words[ind_dig:])
-        print('cities: ', self.arr_name)
+        #self.print('All words', all_words)
+        #self.print('date digit', date_digit)
+        #self.print('Probable city place', all_words[ind_dig:])
+        #self.print('cities', self.arr_name)
+        #print('All words: ', all_words)
+        #print('date digit: ', date_digit)
+        #print('Probable city place: ', all_words[ind_dig:])
+        #print('cities: ', self.arr_name)
         cities = []
-        for (ind, word) in enumerate(city_word):
-            #if '.' in
-            for symb in '.,:- ':
-                if symb in word:
-                    word = word.replace(symb, '')
-            word = word.lower().capitalize()
-            word1 = word
-            word_corr, rate = self.__right_check(word, self.arr_name, flag=1)
-            if rate > max_rate_city:
-                print('City: ', word, 'corr word: ', word_corr)
-                max_rate_city = rate
-                corr_city = word_corr
-                cities.append(corr_city)
-                ind_city = ind
+        cits = self.arr_name.copy()
+        for j in range(len(three_cities)):
+            cities = []
+            for (ind, word) in enumerate(three_cities[j][1]):
+                #if '.' in
+                for symb in '.,:- ':
+                    if symb in word:
+                        word = word.replace(symb, '')
+                word = word.lower().capitalize()
+                word1 = word
+                self.arr_name = cits.copy()
+                for z in range(3):
+                    word_corr, rate,city_ind = self.__right_check(word, self.arr_name, flag=1)
+                    while [word_corr, word, ind, rate] in cities:
+                        self.arr_name = np.delete(self.arr_name, city_ind)
+                        #temp_arr = np.array([word_corr])
+                        #print(temp_arr)
+                        #self.arr_name = np.setdiff1d(self.arr_name, temp_arr)
+                        #print(self.arr_name.shape)
+                        word_corr, rate, city_ind = self.__right_check(word, self.arr_name, flag=1)
+                    temp_arr = np.array([word_corr])
+                    self.arr_name = np.setdiff1d(self.arr_name, temp_arr)
+                    cities.append([word_corr, word, ind, rate])
+
+        three_cities = self.sort_data(cities)
+        cities.clear()
+        del cits
+
+        '''if rate > max_rate_city:
+                    print('City: ', word, 'corr word: ', word_corr)
+                    max_rate_city = rate
+                    corr_city = word_corr
+                    cities.append(corr_city)
+                    ind_city = ind'''
             #word_corr, rate = self.__right_check(word1, self.arr_region, flag=1)
             #if rate > max_rate_reg:
             #    print('Region: ', word1, 'corr word: ', word_corr)
@@ -623,12 +1183,12 @@ class Search:
         # print("Correct_region: ", corr_region, max_rate_reg)
         #if max_rate_reg < 0.6:
         #    corr_region = '-'
-        city = self.city_comparing(cities, pers_data['фмс'])
+        '''city = self.city_comparing(cities, pers_data['фмс'])
         if city != None:
             corr_city = city
         if max_rate_city < 0.6:
-            corr_city = '-'
-        pers_data['место'] = corr_city #+ ' ' + corr_region
+            corr_city = '-' '''
+        pers_data['место'] = three_cities #+ ' ' + corr_region
 
         """for (ind_spec, spec) in enumerate(self.special_words):
             max_ratio = 0
@@ -782,6 +1342,25 @@ class Search:
                         break"""
 
         return pers_data
+
+    def sort_data(self, data):
+        try:
+            if len(data)<3:
+                for j in range(3-len(data)):
+                    data.append(data[0])
+            data.sort(key=lambda x: x[3])
+            k = 0
+            new_data = [0,1,2]
+            for j in range(-1, -4, -1):
+                new_data[k] = data[j][0:]
+                k += 1
+            return new_data
+        except:
+            return [[None, None, 0] for i in range(3)]
+
+    def print(self, about, string):
+        pass
+        #print(f"{about}: {string}")
 
     def median(self, sequence):
         return lv.quickmedian(sequence)
