@@ -334,6 +334,7 @@ class Update:
         if ind_x[-1] < W - 4:
             ind_x[-1] += 4
 
+
         if (((ind_x[0] - 0)+(W-ind_x[-1])) > abs(ind_x[-1]-ind_x[0])//2) or (((ind_y[0] - 0)+(H-ind_y[-1])) > abs(ind_y[-1]-ind_y[0])//2):
             print('Cropp width and height: ', H, W)
             img = img[ind_y[0]:ind_y[-1], ind_x[0]:ind_x[-1]]
