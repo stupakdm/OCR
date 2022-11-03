@@ -1,11 +1,9 @@
-import os, time, re
+import os, re
 
 # from doctr.io import read_img_as_numpy, read_img_as_tensor
 # import tensorflow as tf
 import cv2
-import enchant
-import matplotlib.pyplot as plt
-import numpy as np
+
 import pymorphy2
 from doctr.io import DocumentFile  # , read_img_as_numpy, read_img_as_tensor
 from doctr.models import ocr_predictor
@@ -20,6 +18,8 @@ class Doctr:
     def __init__(self, H, W):
         self.prev_max_block = [(0,0),(0,0)]
         self.max_block = [(0,0),(0,0)]
+        self.max_blocks = [[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)]]
+        self.max_square = 0
         self.min_x = W
         self.max_x = 0
         self.min_y = H
@@ -110,20 +110,13 @@ class Doctr:
             #elif H//W >3:
             #    image = cv2.resize(image, (H,H), interpolation=cv2.INTER_LINEAR)
             #    #H, W = image.shape[:2]
-            #image = cv2.resize(image, (3*W, 3*H), interpolation=cv2.INTER_CUBIC)
-            #H, W = image.shape[:2]
-            #new_image = np.zeros((H*2, W*2, 3))
-            #new_image[:,:,:] = 255
-            #new_image[:,:,1] = 255
-            #new_image[H//2:H+H//2, W//2:W+W//2,:] = image
-            #image = new_image.copy()
+
         img_path = 'save1.jpg'
         cv2.imwrite(img_path, image)
-        #plt.show(image)
         doc = DocumentFile.from_images(img_path)
 
         result = self.model(doc)
-        result.show(doc)
+        #result.show(doc)
         # Show DocTR result
         if flag:
             input()
@@ -153,7 +146,6 @@ class Doctr:
         blocks = res[0]
         words = res[1]
 
-        #words = self.sort_by_geometry(words, blocks)
         # for block in json['pages']:
         #    self.look_geometry(block)
 
@@ -161,13 +153,24 @@ class Doctr:
 
         H, W = image.shape[:2]
         blocks = self.to_right_size(H, W, blocks)
-        self.max_block_left = self.new_size(H,W, self.max_block)
-        self.prev_max_block_left = self.new_size(H, W, self.prev_max_block)
+        self.max_blocks = self.to_right_size(H, W, self.max_blocks)
+        ind = 0
+        for block in self.max_blocks:
+            if block[0] < self.mid_x and ind == 0:
+                self.max_block_left = block.copy()
+                ind += 1
+            elif block[0] < self.mid_x and ind == 1:
+                self.prev_max_block_left = block.copy()
+                break
+        #self.max_block_left = self.new_size(H,W, self.max_block)
+        #self.prev_max_block_left = self.new_size(H, W, self.prev_max_block)
+        #plt.imshow(image[self.max_block_left[1]:self.max_block_left[3], self.max_block_left[0]:self.max_block_left[2]])
+        #plt.title("Max_block")
+        #plt.show()
         if self.max_block_left[3] < self.prev_max_block_left[3]:
             bl = self.max_block_left
             self.max_block_left = self.prev_max_block_left
             self.prev_max_block_left = bl
-        # result.show(doc)
 
         blocks = [x for n, x in enumerate(blocks) if x not in blocks[:n]]
         words = [x for n, x in enumerate(words) if x not in blocks[:n]]
@@ -184,18 +187,13 @@ class Doctr:
         return [int(block[0][0] * W), int(block[0][1] * H), int(block[1][0] * W), int(block[1][1] * H)]
 
 
-    def sort_by_geometry(self, words, blocks):
-        pass
-        #for i in range(len(blocks)):
-        #    for j in range(len(blocks)):
+
 
 
 
     def look_geometry(self, new_word, blocks, words):
-        #print(new_word)
         for block in new_word:
-            #if 'value' in block.keys():
-            #    words.append(block['value'])
+
             if 'pages' in block.keys():
                 res = self.look_geometry(block['pages'], blocks, words)
                 blocks = res[0]
@@ -206,9 +204,18 @@ class Doctr:
                     blocks.append(block_geom)
                     x0, x1 = block_geom[0][0], block_geom[1][0]
                     y0, y1 = block_geom[0][1], block_geom[1][1]
-                    if (x1 - x0) > self.max_block[1][0]-self.max_block[0][0]:
-                        self.prev_max_block = self.max_block
-                        self.max_block = block_geom
+                    square = (x1 - x0)*(y1- y0)
+                    for i in range(len(self.max_blocks)):
+                        max_square = (self.max_blocks[i][1][0]-self.max_blocks[i][0][0])*(self.max_blocks[i][1][1]-self.max_blocks[i][0][1])
+                        if square >= max_square:
+                            for j in range(len(self.max_blocks)-1, i, -1):
+                                self.max_blocks[j] = self.max_blocks[j-1].copy()
+                            self.max_blocks[i] = list(block_geom)
+                            break
+                    #if (x1 - x0)*(y1- y0) > self.max_square:
+                    #    self.prev_max_block = self.max_block
+                    #    self.max_block = block_geom
+                    #    self.max_square = (self.max_block[1][0]-self.max_block[0][0])*(self.max_block[1][1]-self.max_block[0][1])
 
                     if block_geom[0][0] < self.min_x:
                         self.min_x = block_geom[0][0]

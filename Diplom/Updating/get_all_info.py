@@ -1,10 +1,3 @@
-import os
-import time
-import random
-
-import cv2
-import imutils
-import matplotlib.pyplot as plt
 
 from Optimize.updating import Update, show_img
 from Optimize.Rotate_diplom import Rotate
@@ -39,6 +32,7 @@ class Diplom:
             'Имя:':'',
             'Отчество:':'',
         }'''
+        self.city_possible = None
         self.doctr_model = None
         self.tes_model = None
         self.orig_image = cv2.imread(path)
@@ -46,27 +40,26 @@ class Diplom:
     # 1
     def __modify_image(self, image, flag = 1):
         upd = Update()
+        try:
+            if flag == 1:
+                rot = Rotate()
 
-        if flag == 1:
-            rot = Rotate()
+                image = rot.rotate(upd.resize_image(image), image)
+        except:
+            image = image
 
-            image = rot.rotate(upd.resize_image(image), image)
-
-        show_img(image, "Rotated")
         #upd.resize_image(image)
         #upd.find_contours(image)
 
         #upd.check_image(image)
         #show_img(image, 'Before Cropp')
 
-        #upd.cropp_image(image)
         image = upd.corner_images(image)
         #show_img(image, 'Corner cropp')
         #upd.equa_CLAHE_change_hist(image)
         #upd.calc_hist(image)
         #upd.linear_change_hist(image)
         image = upd.unsharp_mask(image, sigma=1.5, threshold=1, amount=2.0, kernel_size=(3,3))
-        show_img(image, "Unsharp mask")
         if flag == 2:
             image = upd.black_white(image)
         #show_img(image, 'Unsharp mask')
@@ -96,6 +89,8 @@ class Diplom:
         else:
             if count_digit >= len(word)//2:
                 return True
+            elif count_digit >= len(word)//3 and '2' in word and '0' in word and 'a' in word:
+                return True
         return False
 
     # 3
@@ -104,9 +99,6 @@ class Diplom:
         info = []
         H, W = img.shape[:2]
 
-
-        left_blocks = []
-        right_blocks = []
 
         max_block = self.doctr_model.max_block_left
         max_w = max_block[2] - max_block[0]
@@ -124,11 +116,14 @@ class Diplom:
         new_words = []
         prev_block = 0
         min_gap_y = 0
-        dist = 0
         blocks_len = 0
         specs = ['бакалавр', 'магистр', 'специалитет']
+        y_prev= 0
+        prev_string = ['']
+        current_string = []
         rate_best = 0
         best_word = specs[0]
+        self.city_possible = [words[0], words[0]]
         for i in range(2):
             info1 = []
             parts = []
@@ -136,22 +131,24 @@ class Diplom:
                 if (i == 0 and block[2] < self.doctr_model.mid_x) or (i == 1 and block[2] > self.doctr_model.mid_x):
                     print('block: ', block)
 
-                    #if (block[3] - block[1]) < avg_h*0.4 or (block[2] - block[0]) < avg_w*0.4:
-                    #    continue
-                    #if (block[3] - block[1])*(block[2]-block[0]) < 200:
-                    #    continue
-
                     block_img = img[block[1]:block[3], block[0]:block[2]]
                     if i == 1:
                         if flag == 0:
-                            if self.rightBD.check_digit(words[ind]) and ind>10:
+                            if self.rightBD.check_digit(words[ind], i) and ind>10 and len(words[ind]) > 5:
                                 parts += left_max_blocks
                                 info1.append(parts.copy())
                                 parts.clear()
+                                index_word = self.rightBD.check_for_letter(words[ind])
                                 word = self.__text_recognition(block_img, self.tes_model)
-                                parts.append([word, words[ind]])
+                                if index_word == -1:
+                                    parts.append([word, words[ind]])
+                                else:
+                                    parts.append([word, words[ind][0:index_word]])
                                 info1.append(parts.copy())
+
                                 parts.clear()
+                                if word != -1:
+                                    parts.append([words[ind][index_word+1:], word])
                                 flag = 1
                                 prev_block = block
                                 dist = blocks[ind + 1][3] - block[1]
@@ -184,12 +181,15 @@ class Diplom:
                                 parts.clear()
                                 flag += 1
                                 prev_block = block
+                                y_prev = block[1]
                                 blocks_len += 1
+                                current_string = [word]
                             continue
                         elif flag == 2:
-                            block_img = img[prev_block[1]:prev_block[3], prev_block[0]:prev_block[2]]
+                            #block_img = img[prev_block[1]:prev_block[3], prev_block[0]:prev_block[2]]
                             block_img = self.__modify_image(block_img, flag=2)
                             word = self.__text_recognition(block_img, self.tes_model)
+                            t = False
                             if word != '':
                                 for word_true in specs:
                                     rate = self.rightBD.cmp_rates(word.lower(), word_true)
@@ -197,31 +197,25 @@ class Diplom:
                                         best_word = word_true
                                         rate_best = rate
                                 if rate_best > 0.8:
-                                    parts.append([words[ind - 1], best_word])
-                                    # info1.append(parts.copy())
+                                    parts.append([words[ind], best_word])
                                     break
-                            prev_block = block
-                            '''if abs(prev_block[3] - block[3]) < min_gap_y and abs(prev_block[2] - block[0]) < min_gap:
-                                blocks_len += 1
-                                prev_block = block
+                            for w in word:
+                                if w.isdigit():
+                                    parts = prev_string
+                                    t = True
+                                    break
+                            if t:
+                                break
+                            if abs(block[1] - y_prev) > 5:
+                                prev_string = current_string
+                                current_string = [[words[ind], word]]
                             else:
-                                if blocks_len == 1:
-                                    block_img = img[prev_block[1]:prev_block[3], prev_block[0]:prev_block[2]]
-                                    word = self.__text_recognition(block_img, self.tes_model)
-                                    if word != '':
-                                        for word_true in specs:
-                                            rate = self.rightBD.cmp_rates(word.lower(), word_true)
-                                            if rate > rate_best:
-                                                best_word = word_true
-                                                rate_best = rate
-                                        if rate_best > 0.8:
-                                            parts.append([words[ind - 1], best_word])
-                                            #info1.append(parts.copy())
-                                            break
-                                    #parts.append([words[ind - 1], word])
-                                    #flag +=1
+                                current_string.append([words[ind], word])
+                            y_prev = block[1]
+                            print('y_prev: ', word, y_prev)
+
                             prev_block = block
-                            blocks_len = 1'''
+
                             continue
 
                     elif flag[1] == 1 and i == 0 and self.__compare(block, self.doctr_model.max_block_left):
@@ -255,6 +249,8 @@ class Diplom:
                                 parts.clear()
                             continue
                         elif self.__check_digit(words[ind]) and count_digit_left >=2:
+                            if 'S' in words[ind]:
+                                words[ind] = words[ind].replace('S', '5')
                             if len(words[ind]) < 2:
                                 continue
                             left_gap = block[0] - min_gap
@@ -288,25 +284,22 @@ class Diplom:
                             continue
                         else:
                             continue
-                        #plt.imshow(block_img)
-                        #plt.show()
-                            #parts.append()
 
 
 
 
+                    if i==0 and flag[1] == 0:
+                        self.city_possible[0]  = self.city_possible[1]
+                        self.city_possible[1] = words[ind]
                     block_img = self.__modify_image(block_img, flag = 2)
                     #show_img(block_img, 'block_img')
-
+                    print(words[ind])
                     word = self.__text_recognition(block_img, self.tes_model)
-                    #print("text: ", word)
                     parts.append(word)
                 else:
                     new_words.append(words[ind])
                     right_blocks.append(block)
-                #print("text: ", tes.detect_text(block_img))
-                #block_img = img[block]
-                #tes.detect_text(block)
+
 
             info1.append(parts.copy())
             info.append(info1.copy())
@@ -315,8 +308,7 @@ class Diplom:
             words = new_words[:(len(new_words)*3)//4]
             info1.clear()
             flag = 0
-            #flag[0] = 1
-            #flag[1] = 0
+
 
         return info
 
@@ -337,24 +329,12 @@ class Diplom:
             return True
         else:
             return False
+
     # 4
     def __text_recognition(self, block, model):
-        #doc = Doctr()
-        #upd = Update()
-        #block = upd.unsharp_mask(block, sigma=1.5, threshold=1, amount=2.0, kernel_size=(3, 3))
-        #block = upd.bright_contrast(block, bright=0.5, contrast=1.2)
         word = model.detect_text(block)
-        """if self.look_digits(word):
-            print('model word: ', word)
-            doc = Doctr()
-            upd = Update()
-            block = upd.unsharp_mask(block, sigma=1.5, threshold=1, amount=2.0, kernel_size=(3, 3))
-            block = upd.bright_contrast(block, bright = 0.5, contrast=1.2)
-            #block =
-            #blocks, words = doc.detect_image(block, True)
-            for w in words:
-                print('Doctr find digits: ', w)"""
         return word
+
 
     # 5.1
     def __chooseBD_left(self, info):
@@ -367,24 +347,43 @@ class Diplom:
                 new_word = info[i][:-1]
                 new_word = [x for x in new_word if x != '']
                 new_word = ' '.join(new_word)
-                cities = self.rightBD.findCity(info[i][-2:])
-                universities = self.rightBD.findUniversity(new_word, cities[0])
+                new_word = self.rightBD.remove_signs(new_word)
+                new_word = new_word.replace('\n', ' ')
+                try:
+                    cities = self.rightBD.findCity(info[i][-2:], self.city_possible)
+                except:
+                    cities = ['']
+                try:
+                    universities = self.rightBD.findUniversity(new_word, cities[0])
+                except:
+                    universities = ['']
                 self.result['Места:'] = cities
                 self.result['Университеты:'] = universities
             if i == 1:
                 word = info[i][-1]
-                level = self.rightBD.findLevel(word)
+                try:
+                    level = self.rightBD.findLevel(word)
+                except:
+                    level = ''
                 self.result['Степень:'] = level
             if i == 2:
-                number = info[i][0][0]
-                series = info[i][1][0]
-                number, series = self.rightBD.findNumberSeries(number, series)
+                series = info[i][0][0]
+                number = info[i][1][0]
+                try:
+                    series, number = self.rightBD.findNumberSeries(series, number)
+                except:
+                    series = '0'*6
+                    number = '0'*7
                 self.result['Серия:'] = series
                 self.result['Номер:'] = number
             if i == 3:
-                reg_number = info[i][0]
-                data_given = info[i][1:]
-                reg_number, datas_given = self.rightBD.findRegNumbDataGiven(reg_number, data_given)
+                try:
+                    reg_number = info[i][0]
+                    data_given = info[i][1:]
+                    reg_number, datas_given = self.rightBD.findRegNumbDataGiven(reg_number, data_given)
+                except:
+                    reg_number = '0'*3
+                    datas_given = ['__ ______ 20__ года']
                 self.result['Рег. номер:'] = reg_number
                 self.result['Даты выдачи:'] = datas_given
                 print("\n\nРезультат:\n", self.result, "\n\n")
@@ -395,67 +394,117 @@ class Diplom:
             chapter.append(new_word)
 
             print('clean_string')
-            # ДОДДЕЛАТЬ(алгоритм удаления одинаковых подстрок)
-            #chapter = rightBD.clean_string(chapter)
+
         words.append(chapter)
 
-        d = random.randint(0, 100)
-        file = open(f'result_{d}.txt','w')
-        for chapter in words:
-            for word in chapter:
-                file.write(word)
-                file.write('\n')
+        #d = random.randint(0, 100)
+        #file = open(f'result_{d}.txt','w')
+        #for chapter in words:
+        #    for word in chapter:
+        #        file.write(word)
+        #        file.write('\n')
 
     # 5.2
     def __chooseBD_right(self, info):
-        words = []
-        for i in range(len(info)):
-            if i == 0:
-                family, name, surname = info[i][0], info[i][0], info[i][0]
-                left = info[i][0][0][0]
-                up = info[i][0][0][1]
-                right = info[i][0][0][2]
-                for j in range(len(info[i])):
-                    if info[i][j][0][0] < left:
-                        left = info[i][j][0][0]
-                        name = info[i][j]
-                    if info[i][j][0][1] < up:
-                        up = info[i][j][0][1]
-                        family = info[i][j]
-                    if info[i][j][0][2] > right:
-                        right = info[i][j][0][2]
-                        surname = info[i][j]
+        try:
+            for i in range(len(info)):
+                if i == 0:
+                    family, name, surname = info[i][0], info[i][0], info[i][0]
+                    left = info[i][0][0][0]
+                    up = info[i][0][0][1]
+                    right = info[i][0][0][2]
+                    for j in range(len(info[i])):
+                        if info[i][j][0][0] < left:
+                            left = info[i][j][0][0]
+                            name = info[i][j]
+                        if info[i][j][0][1] < up:
+                            up = info[i][j][0][1]
+                            family = info[i][j]
+                        if info[i][j][0][2] > right:
+                            right = info[i][j][0][2]
+                            surname = info[i][j]
 
-                fio = self.rightBD.findFIO([family[1], name[1], surname[1]])
-                self.result['Фамилия:'] = fio[0]
-                self.result['Имя:'] = fio[1]
-                self.result['Отчество:'] = fio[2]
+                    try:
+                        fio = self.rightBD.findFIO([family, name, surname])
+                    except:
+                        fio = ['','','']
+                    self.result['Фамилия:'] = fio[0]
+                    self.result['Имя:'] = fio[1]
+                    self.result['Отчество:'] = fio[2]
 
 
-            if i == 1:
-                spec_number = info[i][0]
-                spec_name = info[i+1]
-                spec_number, spec_name = self.rightBD.findSpeciality(spec_number, spec_name)
-                self.result['Специальность:'] = spec_name[0]
-                self.result['Номер специальности:'] = spec_number
+                if i == 1:
+                    spec_number = info[i][0]
+                    if not self.__check_digit(spec_number):
+                        spec_number = info[i][1]
+                    spec_name = info[i+1]
+                    try:
+                        spec_number, spec_name, confidence = self.rightBD.findSpeciality(spec_number, spec_name, self.result['Степень:'])
+                    except:
+                        confidence = False
+                        spec_number = ''
+                        spec_name = ''
+                    if spec_number != '' and confidence:
+                        self.result['Специальность:'] = spec_name[0]
+                        self.result['Номер специальности:'] = spec_number
+                    else:
+                        self.result['Специальность:'] = spec_name
+                        self.result['Номер специальности:'] = spec_number
 
-            if i == 3:
-                cmp_speciality = info[i][0]
-                #level_0 = self.rightBD.findLevel(cmp_speciality[0])
-                level_1 = self.rightBD.findCmpLevel(cmp_speciality[1], self.result['Степень:'])
-                if self.result['Степень:'] == '' and level_1 != None:
-                    self.result['Степень:'] = level_1
-                #self.result['Степень:'] = level
-                break
+                if i == 3:
+                    if self.result['Степень:'] == 'специалитет':
+                        special_number = self.result['Номер специальности:']
+                        if confidence == False:
+                            special_number = ''
+                        cmp_speciality = info[i][0]
+                        try:
+                            quality = self.rightBD.findQuality(cmp_speciality, special_number)
+                        except:
+                            quality = ''
+                        self.result['Квалификация:'] = quality
+                    else:
+                        if self.result['Степень:'] != '':
+                            self.result.pop('Квалификация:')
+                            break
+                        cmp_speciality = info[i][0]
+                        try:
+                            level_1 = self.rightBD.findCmpLevel(cmp_speciality, self.result['Степень:'])
+                        except:
+                            level_1 = ''
+                        if self.result['Степень:'] == '' and level_1 != None:
+                            self.result['Степень:'] = level_1
+                    break
+        except:
+            return
         return
+
+    def form_result(self):
+        self.result['Места:'] = ''
+        self.result['Университеты:'] = ['']
+        self.result['Степень:'] = ''
+        self.result['Серия:'] = '0'*6
+        self.result['Номер:'] = '0'*7
+        self.result['Рег. номер:'] = '00'
+        self.result['Даты выдачи:'] = 'xx месяца 20xx года'
+        self.result['Фамилия:'] = ''
+        self.result['Имя:'] = ''
+        self.result['Отчество:'] = ''
+        self.result['Специальность:'] = ''
+        self.result['Номер специальности:'] = '00.00.00'
+        self.result['Квалификация:'] = ''
 
     def conveer(self):
 
         #Trye
 
         # 1
+        self.form_result()
         self.rightBD = FindWord()
-        image = self.__modify_image(self.orig_image)
+        image = self.orig_image.copy()
+        try:
+            image = self.__modify_image(image)
+        except:
+            pass
         show_img(image, 'after modifing')
         # 2
         text_blocks, text_words = self.__segmentation(image)
@@ -466,7 +515,7 @@ class Diplom:
         print('left chapter:', info[0])
         print('rifht chapter:', info[1])
         # 4
-        info_0 = self.__chooseBD_left(info[0])
-        info_1 = self.__chooseBD_right(info[1])
+        self.__chooseBD_left(info[0])
+        self.__chooseBD_right(info[1])
         print('\nРезультат:\n', self.result)
-        return info
+        return self.result

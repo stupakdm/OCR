@@ -6,11 +6,6 @@ from updating import Update, show_img
 
 class Rotate:
     def rotate_image_true(self, image, angle):
-        """
-        Rotates an OpenCV 2 / NumPy image about it's centre by the given angle
-        (in degrees). The returned image will be large enough to hold the entire
-        new image, with a black background
-        """
 
         # Get the image size
         # No that's not an error - NumPy stores image matricies backwards
@@ -76,10 +71,6 @@ class Rotate:
     #Обрезать фото по бокам
 
     def crop_around_center(self, image, width, height):
-        """
-        Given a NumPy / OpenCV 2 image, crops it to the given width and height,
-        around it's centre point
-        """
 
         image_size = (image.shape[1], image.shape[0])
         image_center = (int(image_size[0] * 0.5), int(image_size[1] * 0.5))
@@ -103,8 +94,8 @@ class Rotate:
             rect = cv2.minAreaRect(cont)
             box = cv2.boxPoints(rect)
             box = np.int0(box)
-            center = (int(rect[0][0]), int(rect[0][1]))
-            area = int(rect[1][0] * rect[1][1])
+            #center = (int(rect[0][0]), int(rect[0][1]))
+            #area = int(rect[1][0] * rect[1][1])
 
             edge1 = np.int0((box[1][0] - box[0][0], box[1][1] - box[0][1]))
             edge2 = np.int0((box[2][0] - box[1][0], box[2][1] - box[1][1]))
@@ -112,19 +103,7 @@ class Rotate:
             print('Edges', edge1, edge2)
             usedEdge = edge2
             reference = (1, 0)
-            #print('flag', flag)
-            # if flag == 0:
-            #if flag == 0:
-            #    usedEdge = edge1
-            #    reference = (1, 0)
-            #else:
-            #    usedEdge = edge2
-            #    reference = (1, 0)
-            """if cv2.norm(edge2) > cv2.norm(edge1) and flag ==1:
-                    usedEdge = edge2
-                    reference = (1,0)
-            else:
-                reference = (0,1)"""
+
 
             angle = 180.0 / math.pi * math.acos((reference[0] * usedEdge[0] + reference[1] * usedEdge[1])
                                                 / (cv2.norm(reference) * cv2.norm(usedEdge)))
@@ -135,11 +114,16 @@ class Rotate:
             return angle
 
     def find_biggest_rect(self, image):
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        hsv_min = np.array((107, 0, 130), np.uint8)
-        hsv_max = np.array((110, 255, 190), np.uint8)
-
-        thresh = cv2.inRange(hsv, hsv_min, hsv_max)
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        show_img(image, 'orginn')
+        rgb_min = np.array((50, 50, 20), np.uint8)
+        rgb_max = np.array((120, 100, 100), np.uint8)
+        #hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        #hsv_min = np.array((107, 0, 130), np.uint8)
+        #hsv_max = np.array((110, 255, 190), np.uint8)
+        #show_img(hsv, 'hsv')
+        thresh = cv2.inRange(image, rgb_min, rgb_max)
+        #thresh = cv2.inRange(hsv, hsv_min, hsv_max)
         H, W = thresh.shape[:2]
 
         if np.sum(thresh)/255 > H*W/15:
@@ -148,7 +132,7 @@ class Rotate:
 
         widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 2))
         blueModifiedImage = cv2.dilate(thresh, widthKernel)
-        #show_img(blueModifiedImage, 'blueModifiedImage')
+        show_img(blueModifiedImage, 'blueModifiedImage')
 
         imageContours = cv2.findContours(blueModifiedImage.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         imageContours = imutils.grab_contours(imageContours)
@@ -183,15 +167,7 @@ class Rotate:
         return new_image
 
     def largest_rotated_rect(self, w, h, angle):
-        """
-        Given a rectangle of size wxh that has been rotated by 'angle' (in
-        radians), computes the width and height of the largest possible
-        axis-aligned rectangle within the rotated rectangle.
 
-        Original JS code by 'Andri' and Magnus Hoff from Stack Overflow
-
-        Converted to Python by Aaron Snoswell
-        """
 
         quadrant = int(math.floor(angle / (math.pi / 2))) & 3
         sign_alpha = angle if ((quadrant & 1) == 0) else math.pi - angle
@@ -223,9 +199,9 @@ class Rotate:
         height, width = rows, cols
 
         show_img(orig_img, 'Origin')
-        #M = cv2.getRotationMatrix2D(((cols - 1) / 2.0, (rows - 1) / 2.0), degree, 1)
-        #dst = cv2.warpAffine(img, M, (cols, rows))
-        rotated = self.rotate_image_true(orig_img, degree)
+
+
+        rotated = self.rotate_image_true(orig_img, (-1)*degree)#(-1)*degree)
         show_img(rotated, 'Rotated full img')
 
         image_rotated_cropped = self.crop_around_center(
@@ -236,22 +212,21 @@ class Rotate:
                 math.radians(degree)
             )
         )
-        #show_img(image_rotated_cropped, 'Rotated and croped')
+
         return image_rotated_cropped
 
     def rotate(self, image_to_rotate, orig_image, key=1):
-        # Изменение размера для корректного поворота
         RESIZED_IMAGE_HEIGHT = 600
-        # h, w = orig_image.shape[0:2]
         # orig_image = imutils.resize(orig_image.copy(), height=RESIZED_IMAGE_HEIGHT, width=int(w*RESIZED_IMAGE_HEIGHT/h))
         image_to_rotate = imutils.resize(image_to_rotate.copy(), height=RESIZED_IMAGE_HEIGHT)
         orig_image = imutils.resize(orig_image.copy(), height=RESIZED_IMAGE_HEIGHT)
         original = orig_image.copy()
-        #self.find_biggest_rect(orig_image)
         rect = self.find_biggest_rect(image_to_rotate)
         print('rect:', rect)
         degree = self.try_find_new_degree(rect)
         print('Degree: ', degree)
+        if degree == 0:
+            return orig_image
         original = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
         cropped_rotated = self.cropped_rotated_image(original, degree)
         return cropped_rotated

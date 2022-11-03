@@ -13,8 +13,8 @@ class Update:
     def resize_image(self, img):
         H, W = img.shape[:2]
         print(img, img.shape)
-        img = img[:H//2, :W//2, :]
-        #show_img(img, 'after resize')
+        img = img[:H//4, :, :]
+        show_img(img, 'after resize')
         return img
 
     def find_contours(self, img):
@@ -691,7 +691,7 @@ class Update:
 def show_img(img, title):
 # print(img.shape)
     # print(img)
-    plt.imshow(img)
-    plt.title(title)
-    plt.show()
-    #pass
+    #plt.imshow(img)
+    #plt.title(title)
+    #plt.show()
+    pass

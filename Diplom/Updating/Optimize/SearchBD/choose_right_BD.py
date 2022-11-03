@@ -1,10 +1,8 @@
-from difflib import SequenceMatcher
 
 import enchant
 import Levenshtein as lv
 import numpy as np
 import pandas as pd
-import time
 import re
 
 
@@ -68,6 +66,7 @@ class FindWord:
         'B': ['В', 'Б', 'Ы', 'Ь'],
         'B|': ['Ы'],
         'C': ['С'],
+        'DK': ['Ж'],
         'D': ['О', 'Ф'],
         'E': ['Е', 'В', 'Я', 'Б'],
         'F': ['Г'],
@@ -75,12 +74,14 @@ class FindWord:
         'Hl': ['П'],
         'H': ['Н', 'И', 'П', 'Ч'],
         '/I': ['Д'],
+        'IB': ['Е'],
         'II': ['П'],
+        'IJ': ['Ц'],
         'IO': ['Ю'],
         'JI': ['Л', 'П'],
         'JL': ['Л'],
         'IL': ['П', 'Ц', 'Н', 'Щ'],
-        'I': ['П', 'Д', 'Г', 'Л', 'И'],
+        'I': ['П', 'Д', 'Г', 'Н', 'Л', 'И'],
         'J': ['У', 'Л', 'Я'],
         'K': ['К'],
         'L': ['Ь', 'Ц'],
@@ -132,9 +133,12 @@ class FindWord:
         curr_dir = 'Updating/Optimize/SearchBD/data/'
         bach = pd.read_csv(f'{curr_dir}/Bachelor.csv', encoding='utf-8', sep=';')
         mag = pd.read_csv(f'{curr_dir}/Magistr.csv', encoding='utf-8', sep=';')
-        spec = pd.read_csv(f'{curr_dir}/Speciality.csv', encoding='utf-8', sep=';')
-        self.spec_number = np.array(spec['number'])
-        self.spec_name = np.array(spec['name'])
+        #spec = pd.read_csv(f'{curr_dir}/Speciality.csv', encoding='utf-8', sep=';')
+        spec_all = pd.read_csv(f'{curr_dir}/special_quality.csv', encoding='utf-8', sep=';')
+        spec_all['quality'].fillna('', inplace=True)
+        self.spec_number = np.array(spec_all['number'])
+        self.spec_name = np.array(spec_all['name'])
+        self.spec_quality = np.array(spec_all['quality'])
         self.mag_number = np.array(mag['number'])
         self.mag_name = np.array(mag['name'])
         self.bach_number = np.array(bach['number'])
@@ -284,16 +288,36 @@ class FindWord:
         best_three = [word[0] for word in best_three if word[0] is not None]
         return best_three
 
-    def findCity(self, word):
+    def findCity(self, word, possible_cities):
         city = word[1]
         if self.cmp_rates(city.lower().capitalize(), 'Дубликат') > 0.8:
             city = word[0]
+        if city == '':
+            city = possible_cities[1]
+            if '.' in city:
+                city = city[city.find('.')+1:]
+            city = self.filterForRegNum(city)
+
+            city = self.translate_word(city, [])
+            all_words = self.check_before_translate(city, size=len(city))
+
+            city = lv.quickmedian(all_words)
+            city = city.lower().capitalize()
         best_cities = self.__check_best_word(self.cities_university, city)
         return best_cities
 
 
     def findUniversity(self, string, city):
-        data = self.universities_by_cities[city]
+        data = None
+        if city != '':
+            data = self.universities_by_cities[city]
+        else:
+            data = self.universities_by_cities.values()
+            full_data = []
+            for d in data:
+                full_data += d
+            data = full_data.copy()
+            full_data.clear()
         best_universities = self.__check_best_word(data, string)
         return best_universities
 
@@ -371,7 +395,7 @@ class FindWord:
             return None
 
     def remove_signs(self, word):
-        symbs = ['.', ',', ':', '(', ')', "'"]
+        symbs = ['.', ',', ':', '(', ')', "'", '‚','‘', '”']
         for symb in symbs:
             while symb in word:
                 word = word[:word.index(symb)]+word[word.index(symb) + 1:len(word)]
@@ -409,9 +433,21 @@ class FindWord:
         # print('filter words', words)
         return words
 
+    def check_for_letter(self, word):
+        for w in word:
+            if w.isalpha():
+                return word.find(w)
+        return -1
+
+    def check_before_translate(self, word, size):
+        if len(word) > size:
+            word = word[:size]
+        return self.translate_word(word, [])
 
     def translate_word(self, word, words):
         all_words = []
+        #if len(word) < 12:
+
         for (ind, letter) in enumerate(word):
             if letter in self.alphabet.keys():
                 if len(self.alphabet[letter]) > 1:
@@ -441,20 +477,35 @@ class FindWord:
 
 
     def find_string(self, word):
-        all_words = self.translate_word(word, [])
+        all_words = self.check_before_translate(word, size=3)
+        #all_words = self.translate_word(word, [])
         all_words = self.filt_words(all_words)
         dict = enchant.Dict('ru_RU')
         all_enchant_words = []
+        levels = [0, 0, 0]
+        levels_begin = ['БАК', 'МАГ', 'СПЕ']
         for word in all_words:
+            for ind, level in enumerate(levels_begin):
+                rate = self.cmp_rates(word, level)
+                levels[ind] += rate
+
+        '''for word in all_words:
             true_w = dict.suggest(word)
             all_enchant_words += true_w
             # all_enchant_words.append(true_w)
-        first_string = lv.quickmedian(all_enchant_words)
-        return first_string
+        first_string = lv.quickmedian(all_enchant_words)'''
+        if max(levels) == levels[0]:
+            return 'бакалавр'
+        if max(levels) == levels[1]:
+            return 'магистр'
+        if max(levels) == levels[2]:
+            return 'специалитет'
+        #return first_string
 
     def findLevel(self, word):
         first_string = self.find_string(word)
-        rate_bach = self.cmp_rates(first_string, 'БАКАЛАВРА')
+        return first_string
+        """rate_bach = self.cmp_rates(first_string, 'БАКАЛАВРА')
         rate_mag = self.cmp_rates(first_string, 'МАГИСТРА')
         rate_spec = self.cmp_rates(first_string, 'СПЕЦИАЛИТЕТА')
         if (rate_bach == max(rate_spec, rate_mag, rate_bach)):
@@ -464,7 +515,7 @@ class FindWord:
         if (rate_spec == max(rate_spec, rate_mag, rate_bach)):
             return "СПЕЦИАЛИТЕТА"
         return 'БАКАЛАВРА'
-
+        """
     def findNumberSeries(self, number, series):
         num = number
         ser = series
@@ -500,23 +551,19 @@ class FindWord:
                 w+=word[i]
         words.append(w)
         return words
-        '''if (word[i].isdigit() and w == '') or (word[i].isdigit() and flag ==0):
-                w+=word[i]
-                flag = 0
-            elif (word[i].isalpha() and w == '') or (word[i].isalpha() and flag==1):
-                w+=word[i]
-                flag = 1
-            elif word[i].isalpha() and flag == 0:
-                words'''
-    def check_digit(self, word):
+
+    def check_digit(self, word, ind=0):
         digit_count = 0
         for w in word:
-            if digit_count > len(word)/2:
+            if digit_count > len(word)//2:
                 return True
             if w.isdigit():
                 digit_count+=1
-        if digit_count > len(word) / 2:
+        if digit_count > len(word) // 2:
             return True
+        if ind == 1:
+            if digit_count >=4:
+                return True
         return False
 
     def filterForRegNum(self, word):
@@ -542,7 +589,7 @@ class FindWord:
                 #best_month = month
         best_three = [word[0].lower() for word in best_three if word[0] is not None]
         return best_three
-        return best_month.lower()
+        #return best_month.lower()
 
     def filter_words_month(self, word):
         start_w = ['А', 'Я', 'Ф', 'М', 'И', 'С', 'О', 'Н', 'Д']
@@ -619,8 +666,10 @@ class FindWord:
         i = 0
         data_length = len(data)
         while i < data_length:
-            data[i][0] = self.filterForRegNum(data[i][0])
-            data[i][1] = self.filterForRegNum(data[i][1])
+            word_0 = self.filterForRegNum(data[i][0])
+            word_1 = self.filterForRegNum(data[i][1])
+            data[i][0] = word_0
+            data[i][1] = word_1
             #data[i][0] = self.filt_words(data[i][0])
             #data[i][1] = self.filt_words(data[i][1])
             d1 = self.checkfordigits(data[i][0])
@@ -640,6 +689,7 @@ class FindWord:
             data_length = len(data)
         date = []
         data = data[:-1]
+
         for ind, word in enumerate(data):
             if self.check_digit(word[0]):
                 if ind ==2:
@@ -706,26 +756,44 @@ class FindWord:
     def findFIO(self, fio):
         fio_bd = []
         for i in range(len(fio)):
-            fio[i] = self.filterForRegNum(fio[i])
-            fio[i] = fio[i].lower().capitalize()
+            word = fio[i][1]
+            if word == '':
+                word = fio[i][2]
+                word = word.upper()
+                all_words = self.check_before_translate(word, size = len(word))
+                #all_words = self.translate_word(word, words=[])
+                #all_words = self.filt_words(all_words)
+                first_string = lv.quickmedian(all_words)
+                '''dict = enchant.Dict('ru_RU')
+                all_enchant_words = []
+                for word in all_words:
+                    true_w = dict.suggest(word)
+                    all_enchant_words += true_w
+                    # all_enchant_words.append(true_w)
+                first_string = lv.quickmedian(all_enchant_words)'''
+                word = self.filterForRegNum(first_string)
+                word = word.lower().capitalize()
+            else:
+                word = self.filterForRegNum(word)
+                word = word.lower().capitalize()
             #next_symb_ind = self.rus_alphabet_upper.find(fio[i][0])+1
             #next_symb = self.rus_alphabet_upper[next_symb_ind]
-            if None in self.begin_fio_bd[fio[i][0]]:
+            if None in self.begin_fio_bd[word[0]]:
                 if i == 0:
-                    fio[i] = self.__check_best_word(self.families, fio[i])
+                    word = self.__check_best_word(self.families, word)
                 if i == 1:
-                    fio[i] = self.__check_best_word(self.names, fio[i])
+                    word = self.__check_best_word(self.names, word)
                 if i == 2:
-                    fio[i] = self.__check_best_word(self.surnames, fio[i])
+                    word = self.__check_best_word(self.surnames, word)
             else:
                 if i == 0:
-                    fio[i] = self.__check_best_word(self.families[self.begin_fio_bd[fio[i][0]][i][0]: self.begin_fio_bd[fio[i][0]][i][1]], fio[i])
+                    word = self.__check_best_word(self.families[self.begin_fio_bd[word[0]][i][0]: self.begin_fio_bd[word[0]][i][1]], word)
                 if i == 1:
-                    fio[i] = self.__check_best_word(self.names[self.begin_fio_bd[fio[i][0]][i][0]: self.begin_fio_bd[fio[i][0]][i][1]], fio[i])
+                    word = self.__check_best_word(self.names[self.begin_fio_bd[word[0]][i][0]: self.begin_fio_bd[word[0]][i][1]], word)
                 if i == 2:
-                    fio[i] = self.__check_best_word(self.surnames[self.begin_fio_bd[fio[i][0]][i][0]: self.begin_fio_bd[fio[i][0]][i][1]], fio[i])
-
-        return fio
+                    word = self.__check_best_word(self.surnames[self.begin_fio_bd[word[0]][i][0]: self.begin_fio_bd[word[0]][i][1]], word)
+            fio_bd.append(word)
+        return fio_bd
 
     def findSpecNumber(self, number):
         num_1 = None
@@ -733,46 +801,143 @@ class FindWord:
         num_2 = None
         num_2_spec = None
         if number[0] != '':
+            number[0] = self.clean_number(number[0])
             if number[0] in self.bach_number:
                 num_1 = number[0]
                 num_1_spec = self.bach_name[np.where(num_1 == self.bach_number)]
             elif number[0] in self.mag_number:
                 num_1 = number[0]
-                num_1_spec = self.mag_name[np.where(num_1 == self.mag_name)]
+                num_1_spec = self.mag_name[np.where(num_1 == self.mag_number)]
             elif number[0] in self.spec_number:
                 num_1 = number[0]
-                num_1_spec = self.spec_name[np.where(num_1 == self.spec_name)]
+                num_1_spec = self.spec_name[np.where(num_1 == self.spec_number)]
         if number[1] != '':
+            num = self.clean_number(number[1])
+            number[1] = num
             if number[1] in self.bach_number:
                 num_2 = number[1]
                 num_2_spec = self.bach_name[np.where(num_2 == self.bach_number)]
             elif number[1] in self.mag_number:
                 num_2 = number[1]
-                num_2_spec = self.mag_name[np.where(num_2 == self.mag_name)]
+                num_2_spec = self.mag_name[np.where(num_2 == self.mag_number)]
             elif number[1] in self.spec_number:
                 num_2 = number[1]
-                num_2_spec = self.spec_name[np.where(num_2 == self.spec_name)]
+                num_2_spec = self.spec_name[np.where(num_2 == self.spec_number)]
         if num_1 != None:
             return num_1, num_1_spec
         if num_1 == None and num_2 != None:
             return num_2, num_2_spec
+        else:
+            if number[1] != '' and number[1] != None:
+                return number[1], ''
         return '', ''
 
+    def clean_number(self, number):
+        new_n = ''
+        fl = 0
+        count_d = 0
+        for w in number:
+            if w.isdigit():
+                new_n += w
+                fl+=1
+            if fl == 2:
+                count_d +=1
+                if count_d ==3:
+                    break
+                new_n += '.'
+                fl = 0
+        return new_n
 
-    def findSpeciality(self, number, name):
+    def findSpecialName(self, name, level):
+        word1 = ''
+        for w in name:
+            word1 += w[1]+' '
+        word1 = word1.strip(' ')
+        data = None
+        if level != '':
+            if level == 'бакалавр':
+                data = self.bach_name
+            if level == 'магистр':
+                data = self.mag_name
+            if level == 'специалитет':
+                data = self.spec_name
+        else:
+            data = np.unique(np.append(np.append(self.bach_name, self.mag_name), self.spec_name))
+
+        if word1 != '':
+            all_names = self.__check_best_word(data, word1)
+        else:
+            words = []
+            for word in name:
+                all_words = self.check_before_translate(word[0], size=15)
+                all_words = self.filt_words(all_words)
+
+                poss_word = lv.quickmedian(all_words)
+                words.append(poss_word)
+            poss_word = ' '.join(words)
+            all_names = self.__check_best_word(data, poss_word)
+        return all_names
+
+    def findSpeciality(self, number, name, level):
+        confidence = True
+        if '.' not in number[0] and '.' not in number[1]:
+            confidence = False
         number, prev_name = self.findSpecNumber(number)
-        return number, prev_name
+        if prev_name == '' or confidence == False:
+            confidence = False
+            prev_name = self.findSpecialName(name, level)
+        return number, prev_name, confidence
 
     def findCmpLevel(self, level, cmp_level):
-        level = level.lower()
+        #level = level.lower()
+        word_cmp = level[1]
+        if word_cmp == '':
+            word_cmp = level[0].upper()
+            all_words = self.check_before_translate(word_cmp, size=3)
+            # all_words = self.translate_word(word, words=[])
+            all_words = self.filt_words(all_words)
+            word_cmp = lv.quickmedian(all_words)
+            word_cmp = word_cmp.lower().capitalize()
+        #print(level)
         specs = ['бакалавр', 'магистр', 'специалитет']
-        level = self.__check_best_word(specs, level)
-
+        level = self.__check_best_word(specs, word_cmp)
+        #print(level)
         #level = self.cmp_lv_date(level, specs)
         return level[0].lower()
 
+    def findQuality(self, word, special_number):
+        word_cmp = word[1]
+        if word_cmp == '':
+            word_cmp = word[0].upper()
+            all_words = self.check_before_translate(word_cmp, size=15)
+            # all_words = self.translate_word(word, words=[])
+            all_words = self.filt_words(all_words)
+            word_cmp = lv.quickmedian(all_words)
 
-    def compare_strings(self, new_string):
+        if special_number !='':
+            poss_qualities = self.spec_quality[np.where(self.spec_number == special_number)]
+            poss_qualities = poss_qualities.split('.')
+            best_word = self.__check_best_word(poss_qualities, word_cmp)
+        else:
+            best_rate = self.cmp_rates(word_cmp, '')
+            best_word = ''
+            for all_words in self.spec_quality:
+                words = all_words.split('.')
+                for word_valid in words:
+                    rate = self.cmp_rates(word_cmp, word_valid)
+                    if rate>best_rate:
+                        best_rate = rate
+                        best_word = word_valid
+
+            #best_word = self.__check_best_word(self.spec_quality, word_cmp)
+
+        if best_word == '' or best_word == [] or best_word == None:
+            best_word = ''
+
+        return best_word
+
+
+    """def compare_strings(self, new_string):
         # Предобработка строки
         new_string = self.proccess_string(new_string)
 
@@ -824,8 +989,9 @@ class FindWord:
 
         print("Find word: ", new_string)
         return new_string
+    """
 
-    @classmethod
+    """"@classmethod
     def longest_substring(cls, str1, str2, m, n):
 
         lcSuff = [[0 for k in range(n+1)] for l in range(m+1)]
@@ -844,7 +1010,8 @@ class FindWord:
                     substr = ''
                     lcSuff[i][j] = 0
         return substr
-
+    """
+    """
     def parse_words(self, words):
         new_words = []
         for (ind, word1) in enumerate(words):
@@ -869,7 +1036,9 @@ class FindWord:
             #new_words1 = []
             new_words += words
         return new_words
-
+    
+    """
+    """
     def find_special_words(self, words):
         i = 0
         w_length = len(words)
@@ -897,7 +1066,8 @@ class FindWord:
                     break
             i+=1
         return words
-
+    """
+    """
     def clean_string(self, words):
 
         words = self.parse_words(words)
@@ -927,7 +1097,7 @@ class FindWord:
         print('special words: ', words)
         return words
 
-        """for (ind, word1) in words:
+        for (ind, word1) in words:
             l = len(words)
             new_word = []
             for i in range(ind+1, l):
@@ -946,4 +1116,5 @@ class FindWord:
                             del new_word[j]
                             j-=1
                             ll= len(new_word)
-                    del words"""
+                    del words
+    """
