@@ -1,5 +1,5 @@
 
-if __name__=="__main":
+if __name__==__main:
     enter = input()
     s1 = dict()
     s1['('] = [i for i,x in enumerate(enter) if x =='(']
