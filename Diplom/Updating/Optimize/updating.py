@@ -10,10 +10,11 @@ from imutils.object_detection import non_max_suppression
 class Update:
 
 
+
     def resize_image(self, img):
         H, W = img.shape[:2]
-        print(img, img.shape)
-        img = img[:H//4, :, :]
+        #print(img, img.shape)
+        img = img[:H//8, :, :]
         show_img(img, 'after resize')
         return img
 
@@ -24,8 +25,8 @@ class Update:
         img = self.black_white(img)
         contours = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         min_x, min_y, max_x, max_y = 0,0,H,W
-        for cont in contours:
-            print(cont)
+        #for cont in contours:
+            #print(cont)
 
 
     def check_image(self, img):
@@ -37,8 +38,8 @@ class Update:
 
         thresh = cv2.inRange(hsv, hsv_min, hsv_max)
         H, W = thresh.shape[:2]
-        print(H*W)
-        print(np.sum(thresh)/255)
+        #print(H*W)
+        #print(np.sum(thresh)/255)
         show_img(thresh, 'thresh 1')
         if np.sum(thresh)/255 > H*W/15:
             heightKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 20))
@@ -68,7 +69,7 @@ class Update:
         cv2.rectangle(new_image, (lineContourInfo['x'], lineContourInfo['y']),
                       (lineContourInfo['x']+lineContourInfo['w'], lineContourInfo['y']+lineContourInfo['h']), 255, 2)
         show_img(new_image, 'Rectangles')
-        print('lineContourInfo', lineContourInfo)
+        #print('lineContourInfo', lineContourInfo)
             #return lineContourInfo
 
     def cropp_image(self, img):
@@ -106,8 +107,8 @@ class Update:
 
         dest = cv2.dilate(dest, None)
 
-        print(dest.shape)
-        print(img.shape)
+        #print(dest.shape)
+        #print(img.shape)
         # print(dest)
         ind_y, ind_x = np.where(dest > 0.01 * dest.max())
         ind_y = np.sort(ind_y)
@@ -344,13 +345,13 @@ class Update:
         rH = H / float(newH)
         # rW = W
         # rH = H
-        print(img.shape[:2])
+        #print(img.shape[:2])
         img = cv2.resize(img, (newW, newH))
         (H, W) = img.shape[:2]
         blob = cv2.dnn.blobFromImage(img, 1.0, (W, H),
                                      (123.68, 116.78, 103.94),
                                      swapRB=True, crop=False)
-        print(blob.shape)
+        #print(blob.shape)
         model.setInput(blob)
         (scores, geometry) = model.forward(layerNames)
 
@@ -579,7 +580,7 @@ class Update:
     # Изменить размер изображения
     def resize_img(self, image, x_col=1.0, x_rows=1.0, interpolation=cv2.INTER_CUBIC):
         cols, rows = image.shape[0:2]
-        print(cols, rows)
+        #print(cols, rows)
         img = cv2.resize(image, (int(rows * x_rows), int(cols * x_col)), interpolation=interpolation)
         show_img(img, 'resize')
         return img
@@ -592,7 +593,7 @@ class Update:
                     image[x, y] = np.array([255] * 3)
                 else:
                     image[x, y] = np.array([0] * 3)
-        print(image)
+        #print(image)
         return image
 
     # Можно добавить threshold
@@ -660,7 +661,7 @@ class Update:
         contours, hierarchy = cv2.findContours(img.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         # print(contours)
         contours = [cv2.approxPolyDP(con, 3, True) for con in contours]
-        print(contours)
+        #print(contours)
         level = 3
         image = update(level)
         cv2.drawContours(orig_img, contours, 0, (128, 255, 255),

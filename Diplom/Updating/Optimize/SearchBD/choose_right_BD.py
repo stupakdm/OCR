@@ -1,9 +1,11 @@
-
 import enchant
 import Levenshtein as lv
 import numpy as np
 import pandas as pd
 import re
+import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from psycopg2 import Error
 
 
 
@@ -16,7 +18,7 @@ def optimize_strings(file, name):
         for (i,line) in enumerate(lines):
             line = line.replace('"', '')
             line = line.replace('\n', '')
-            print(f"{i}: {line}")
+            #print(f"{i}: {line}")
             if (' ' not in line):
                 continue
             ind = line.find(' ')
@@ -32,7 +34,152 @@ def create_specialities():
         optimize_strings(files[i], new_name[i])
 
 
+def create_database():
+    try:
+        connection = psycopg2.connect(user="postgres",
+                                      password='1111',
+                                      host='127.0.0.1',
+                                      port="5432")
+        # database="postgres_db")
+        connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = connection.cursor()
 
+        sql_screate_database = 'create database prostgres_db'
+        cursor.execute(sql_screate_database)
+    except (Exception, Error) as error:
+        print("Ошибка при работе с PostgreSQL", error)
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            print("Соединение с PostgreSQL закрыто")
+
+def create_table():
+    try:
+        connection = psycopg2.connect(user="postgres",
+                                      # пароль, который указали при установке PostgreSQL
+                                      password="1111",
+                                      host="127.0.0.1",
+                                      port="5432",
+                                      database="postgres_db")
+
+        # Курсор для выполнения операций с базой данных
+        cursor = connection.cursor()
+        create_table_bachelor = '''CREATE TABLE bachelor
+                                (id integer PRIMARY KEY NOT NULL,
+                                number text NOT NULL,
+                                name text NOT NULL);'''
+
+        # Выполнение команды: это создает новую таблицу
+        cursor.execute(create_table_bachelor)
+        connection.commit()
+
+        create_table_magistr = '''CREATE TABLE magistr
+                                (id integer PRIMARY KEY NOT NULL,
+                                number text NOT NULL,
+                                name text NOT NULL);'''
+        cursor.execute(create_table_magistr)
+        connection.commit()
+        create_table_speciality = '''CREATE TABLE speciality
+                                (id integer PRIMARY KEY NOT NULL,
+                                number text NOT NULL,
+                                name text NOT NULL,
+                                quality text);'''
+
+        cursor.execute(create_table_speciality)
+        connection.commit()
+
+        create_table_univerity = '''CREATE TABLE university
+                                            (id integer PRIMARY KEY NOT NULL,
+                                            full_name text NOT NULL,
+                                            adress text NOT NULL);'''
+
+        cursor.execute(create_table_univerity)
+        connection.commit()
+
+        create_table_namessurnames = '''CREATE TABLE namessurnames
+                                                (id integer PRIMARY KEY NOT NULL,
+                                                name text NOT NULL,
+                                                surname text NOT NULL,
+                                                priority integer NOT NULL);'''
+
+        cursor.execute(create_table_namessurnames)
+
+        connection.commit()
+        create_table_families = '''CREATE TABLE families
+                                                (id integer PRIMARY KEY NOT NULL,
+                                                family text NOT NULL);'''
+
+        cursor.execute(create_table_families)
+        connection.commit()
+    except (Exception, Error) as error:
+        print("Ошибка при работе с PostgreSQL", error)
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            print("Соединение с PostgreSQL закрыто")
+
+def insert_values():
+    curr_dir = 'Updating/Optimize/SearchBD/data/'
+    try:
+        connection = psycopg2.connect(user="postgres",
+                                      # пароль, который указали при установке PostgreSQL
+                                      password="1111",
+                                      host="127.0.0.1",
+                                      port="5432",
+                                      database="postgres_db")
+
+        # Курсор для выполнения операций с базой данных
+        cursor = connection.cursor()
+
+        #Insert Values
+        bach = pd.read_csv(f'{curr_dir}/Bachelor.csv', encoding='utf-8', sep=';')
+        for i, row in bach.iterrows():
+            cursor.execute(f"INSERT INTO bachelor VALUES ({i}, {row['number']}, {row['name']})")
+            #print(row['number'], row['name'])
+        connection.commit()
+
+        bach.close()
+
+        mag = pd.read_csv(f'{curr_dir}/Magistr.csv', encoding='utf-8', sep=';')
+        for i, row in mag.iterrows():
+            cursor.execute(f"INSERT INTO magistr VALUES ({i}, {row['number']}, {row['name']})")
+            #print(row['number'], row['name'])
+        connection.commit()
+
+        spec_all = pd.read_csv(f'{curr_dir}/special_quality.csv', encoding='utf-8', sep=';')
+        spec_all['quality'].fillna('', inplace=True)
+        for i, row in spec_all.iterrows():
+            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['number']}, {row['name']}, {row['quality']})")
+            #print(row['number'], row['name'])
+        connection.commit()
+
+        universities = pd.read_csv(f'{curr_dir}/Университеты России.csv', encoding='utf-8', sep=',')
+        for i, row in universities.iterrows():
+            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['Full Name']}, {row['Adress']})")
+            #print(row['number'], row['name'])
+        connection.commit()
+
+        df_name = pd.read_csv(f'{curr_dir}Names_and_surnames2.csv', encoding='utf-8', sep=',')
+        for i, row in df_name.iterrows():
+            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['name']}, {row['surname']}, {row['priority']})")
+            #print(row['number'], row['name'])
+        connection.commit()
+
+        df_families = pd.read_csv(f'{curr_dir}families3.csv', encoding='utf-8')
+        for i, row in df_families.iterrows():
+            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['family']})")
+            #print(row['number'], row['name'])
+        connection.commit()
+
+    except (Exception, Error) as error:
+        print("Ошибка при работе с PostgreSQL", error)
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            print("Соединение с PostgreSQL закрыто")
         #f = open('Bachelor.csv')
 class FindWord:
     rus_alphabet = 'ёабвгдежзийклмнопрстуфхцчшщъыьэюя'
@@ -83,11 +230,11 @@ class FindWord:
         'IL': ['П', 'Ц', 'Н', 'Щ'],
         'I': ['П', 'Д', 'Г', 'Н', 'Л', 'И'],
         'J': ['У', 'Л', 'Я'],
-        'K': ['К'],
+        'K': ['К', 'Ж'],
         'L': ['Ь', 'Ц'],
         'M': ['М', 'И', 'Й'],
         'N': ['И', 'Й', 'Н'],
-        'O': ['О'],
+        'O': ['О', 'Ф'],
         'P': ['Р'],
         'Q': ['О'],
         'R': ['Я', 'К'],
@@ -101,10 +248,373 @@ class FindWord:
         'X': ['Х', 'У', 'Ж', 'Д'],
         'Y': ['У', 'Х', 'Ж', 'Ч'],
         'Z': ['И', 'Й'],
+        '10': ['Ю'],
+        '0': ['О'],
+        '1': ['И'],
     }
+    """     
+            try:
+                connection = psycopg2.connect(user="postgres",
+                                              password = '1111',
+                                              host='127.0.0.1',
+                                              port = "5432")
+                                              #database="postgres_db")
+                connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+                cursor = connection.cursor()
+
+                sql_screate_database = 'create database prostgres_db'
+                cursor.execute(sql_screate_database)
+            except (Exception, Error) as error:
+                print("Ошибка при работе с PostgreSQL", error)
+            finally:
+                if connection:
+                    cursor.close()
+                    connection.close()
+                    print("Соединение с PostgreSQL закрыто")
+            #Подключение к БД и создание таблицы
+            try:
+                connection = psycopg2.connect(user="postgres",
+                                              # пароль, который указали при установке PostgreSQL
+                                              password="1111",
+                                              host="127.0.0.1",
+                                              port="5432",
+                                              database="postgres_db")
+
+                # Курсор для выполнения операций с базой данных
+                cursor = connection.cursor()
+                create_table_bachelor = '''CREATE TABLE BACHELOR
+                                        (id integer PRIMARY KEY NOT NULL,
+                                        number text NOT NULL,
+                                        name text NOT NULL);'''
+
+                # Выполнение команды: это создает новую таблицу
+                cursor.execute(create_table_bachelor)
+                connection.commit()
+
+                create_table_magistr = '''CREATE TABLE MAGISTR
+                                        (id integer PRIMARY KEY NOT NULL,
+                                        number text NOT NULL,
+                                        name text NOT NULL);'''
+                cursor.execute(create_table_magistr)
+                connection.commit()
+                create_table_speciality ='''CREATE TABLE SPECIALITY
+                                        (id integer PRIMARY KEY NOT NULL,
+                                        number text NOT NULL,
+                                        name text NOT NULL,
+                                        quality text);'''
 
 
+                cursor.execute(create_table_speciality)
+                connection.commit()
+
+                bach = pd.read_csv(f'{curr_dir}/Bachelor.csv', encoding='utf-8', sep=';')
+                for number, name in bach.items():
+                    print(number, name)
+
+
+
+            except (Exception, Error) as error:
+                print("Ошибка при работе с PostgreSQL", error)
+            finally:
+                if connection:
+                    cursor.close()
+                    connection.close()
+                    print("Соединение с PostgreSQL закрыто")
+            """
     def __init__(self):
+        #Create database
+        curr_dir = 'Updating/Optimize/SearchBD/data/'
+        """try:
+            connection = psycopg2.connect(user="postgres",
+                                            password = '1111',
+                                            host='127.0.0.1',
+                                            port = "5432")
+                                          #database="postgres_db")
+            connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cursor = connection.cursor()
+
+            sql_screate_database = 'create database prostgres_db'
+            cursor.execute(sql_screate_database)
+        except (Exception, Error) as error:
+            print("Ошибка при работе с PostgreSQL", error)
+        finally:
+            if connection:
+                cursor.close()
+                connection.close()
+                print("Соединение с PostgreSQL закрыто")
+
+        #Подключение к БД и создание таблицы
+        try:
+            connection = psycopg2.connect(user="postgres",
+                                          # пароль, который указали при установке PostgreSQL
+                                          password="1111",
+                                          host="127.0.0.1",
+                                          port="5432",
+                                          database="postgres_db")
+
+            # Курсор для выполнения операций с базой данных
+            cursor = connection.cursor()
+            create_table_bachelor = '''CREATE TABLE bachelor
+                                    (id integer PRIMARY KEY NOT NULL,
+                                    number text NOT NULL,
+                                    name text NOT NULL);'''
+
+            # Выполнение команды: это создает новую таблицу
+            cursor.execute(create_table_bachelor)
+            connection.commit()
+
+            create_table_magistr = '''CREATE TABLE magistr
+                                    (id integer PRIMARY KEY NOT NULL,
+                                    number text NOT NULL,
+                                    name text NOT NULL);'''
+            cursor.execute(create_table_magistr)
+            connection.commit()
+            create_table_speciality ='''CREATE TABLE speciality
+                                    (id integer PRIMARY KEY NOT NULL,
+                                    number text NOT NULL,
+                                    name text NOT NULL,
+                                    quality text);'''
+
+
+            cursor.execute(create_table_speciality)
+            connection.commit()
+
+            create_table_univerity = '''CREATE TABLE university
+                                                (id integer PRIMARY KEY NOT NULL,
+                                                full_name text NOT NULL,
+                                                adress text NOT NULL);'''
+
+            cursor.execute(create_table_univerity)
+            connection.commit()
+
+            create_table_namessurnames = '''CREATE TABLE namessurnames
+                                                    (id integer PRIMARY KEY NOT NULL,
+                                                    name text NOT NULL,
+                                                    surname text NOT NULL,
+                                                    priority integer NOT NULL);'''
+
+            cursor.execute(create_table_namessurnames)
+
+            connection.commit()
+            create_table_families = '''CREATE TABLE families
+                                                    (id integer PRIMARY KEY NOT NULL,
+                                                    family text NOT NULL);'''
+
+            cursor.execute(create_table_families)
+            connection.commit()
+
+
+            #Insert Values
+            bach = pd.read_csv(f'{curr_dir}/Bachelor.csv', encoding='utf-8', sep=';')
+            for i, row in bach.iterrows():
+                cursor.execute(f"INSERT INTO bachelor VALUES ({i}, {row['number']}, {row['name']})")
+                #print(row['number'], row['name'])
+            connection.commit()
+
+            bach.close()
+
+            mag = pd.read_csv(f'{curr_dir}/Magistr.csv', encoding='utf-8', sep=';')
+            for i, row in mag.iterrows():
+                cursor.execute(f"INSERT INTO magistr VALUES ({i}, {row['number']}, {row['name']})")
+                #print(row['number'], row['name'])
+            connection.commit()
+
+            spec_all = pd.read_csv(f'{curr_dir}/special_quality.csv', encoding='utf-8', sep=';')
+            spec_all['quality'].fillna('', inplace=True)
+            for i, row in spec_all.iterrows():
+                cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['number']}, {row['name']}, {row['quality']})")
+                #print(row['number'], row['name'])
+            connection.commit()
+
+            universities = pd.read_csv(f'{curr_dir}/Университеты России.csv', encoding='utf-8', sep=',')
+            for i, row in universities.iterrows():
+                cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['Full Name']}, {row['Adress']})")
+                #print(row['number'], row['name'])
+            connection.commit()
+
+            df_name = pd.read_csv(f'{curr_dir}Names_and_surnames2.csv', encoding='utf-8', sep=',')
+            for i, row in df_name.iterrows():
+                cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['name']}, {row['surname']}, {row['priority']})")
+                #print(row['number'], row['name'])
+            connection.commit()
+
+            df_families = pd.read_csv(f'{curr_dir}families3.csv', encoding='utf-8')
+            for i, row in df_families.iterrows():
+                cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['family']})")
+                #print(row['number'], row['name'])
+            connection.commit()
+
+        except (Exception, Error) as error:
+            print("Ошибка при работе с PostgreSQL", error)
+        finally:
+            if connection:
+                cursor.close()
+                connection.close()
+                print("Соединение с PostgreSQL закрыто")
+        """
+
+        #Get data by SELECT
+        try:
+            connection = psycopg2.connect(user="postgres",
+                                          # пароль, который указали при установке PostgreSQL
+                                          password="1111",
+                                          host="127.0.0.1",
+                                          port="5432",
+                                          database="postgres_db")
+            cursor = connection.cursor()
+            sql_get_bachelor = 'SELECT * FROM bachelor'
+            cursor.execute(sql_get_bachelor)
+            bach = cursor.fetchall()
+
+            sql_get_magistr = 'SELECT * FROM magistr'
+            cursor.execute(sql_get_magistr)
+            mag = cursor.fetchall()
+
+            sql_get_speciality = 'SELECT * FROM speciality'
+            cursor.execute(sql_get_speciality)
+            spec = cursor.fetchall()
+
+            sql_get_university = 'SELECT * FROM university'
+            cursor.execute(sql_get_university)
+            university = cursor.fetchall()
+
+            sql_get_namessurnames = 'SELECT * FROM namessurnames'
+            cursor.execute(sql_get_namessurnames)
+            namessurnames = cursor.fetchall()
+
+            sql_get_families = 'SELECT * FROM families'
+            cursor.execute(sql_get_families)
+            families = cursor.fetchall()
+
+        except (Exception, Error) as error:
+            print("Ошибка при работе с PostgreSQL", error)
+        finally:
+            if connection:
+                cursor.close()
+                connection.close()
+                print("Соединение с PostgreSQL закрыто")
+
+        sogl1 = 'йцкгшщзхфвпрджчмьб'
+        sogl2 = 'нслт'
+        eng_sogl = 'qwrtpsdfghjklzxcvbnm'
+        eng_gl = 'aeyuio'
+        self.eng_sogl = eng_sogl + eng_sogl.upper()
+        self.eng_gl = eng_gl + eng_gl.upper()
+        self.gl = 'уеёаоэяию'
+        self.sogl = sogl1 + sogl1.upper() + sogl2 + sogl2.upper()
+        self.gl += self.gl.upper()
+        self.ban = 'ыьйъ'
+        self.ban += self.ban.upper()
+
+        self.engl_alphabet = dict()
+
+        for key in self.alphabet.keys():
+            for letter in self.alphabet[key]:
+                if letter not in self.engl_alphabet.keys():
+                    self.engl_alphabet[letter] = [key]
+                else:
+                    self.engl_alphabet[letter].append(key)
+
+        curr_dir = 'Updating/Optimize/SearchBD/data/'
+        bach = pd.read_csv(f'{curr_dir}/Bachelor.csv', encoding='utf-8', sep=';')
+
+        mag = pd.read_csv(f'{curr_dir}/Magistr.csv', encoding='utf-8', sep=';')
+        # spec = pd.read_csv(f'{curr_dir}/Speciality.csv', encoding='utf-8', sep=';')
+        spec_all = pd.read_csv(f'{curr_dir}/special_quality.csv', encoding='utf-8', sep=';')
+        spec_all['quality'].fillna('', inplace=True)
+        self.spec_number = np.array(spec_all['number'])
+        self.spec_name = np.array(spec_all['name'])
+        self.spec_quality = np.array(spec_all['quality'])
+        self.mag_number = np.array(mag['number'])
+        self.mag_name = np.array(mag['name'])
+        self.bach_number = np.array(bach['number'])
+        self.bach_name = np.array(bach['name'])
+        universities = pd.read_csv(f'{curr_dir}/Университеты России.csv', encoding='utf-8', sep=',')
+        self.universities = np.array(universities['Full Name'])
+        self.cities_university = np.array(universities['Adress'])
+        for i in range(self.cities_university.shape[0]):
+            city = self.cities_university[i]
+            city = city.lower()
+            substr = ''
+            if 'г.' in city:
+                substr = 'г.'
+            elif 'с.' in city:
+                substr = 'с.'
+            elif 'пгт.' in city:
+                substr = 'пгт.'
+            elif 'пос.' in city:
+                substr = 'пос.'
+            elif 'д.' in city:
+                substr = 'дер.'
+            elif 'хут.' in city:
+                substr = 'хут.'
+            f = city.find(substr)
+            n = f + len(substr)
+            if city[n] == ' ':
+                n += 1
+            name = city[n:]
+            name = name[:name.find(' ') - 1]
+            self.cities_university[i] = substr + ' ' + name.capitalize()
+        self.universities_by_cities = dict()
+        for i in range(self.cities_university.shape[0]):
+            if self.cities_university[i] not in self.universities_by_cities.keys():
+                self.universities_by_cities[self.cities_university[i]] = [self.universities[i]]
+            else:
+                self.universities_by_cities[self.cities_university[i]].append(self.universities[i])
+
+        df_name = pd.read_csv(f'{curr_dir}Names_and_surnames2.csv', encoding='utf-8')
+        self.names = np.array(df_name['name'])
+        self.surnames = np.array(df_name['surname'])
+        self.priority = np.array(df_name['priority'])
+
+        df_families = pd.read_csv(f'{curr_dir}families3.csv', encoding='utf-8')
+        self.families = np.array(df_families['family'])
+
+        self.begin_fio_bd = dict()
+        for w in self.rus_alphabet_upper:
+            self.begin_fio_bd[w] = []
+            self.begin_fio_bd[w].append([0, None])
+            self.begin_fio_bd[w].append([0, None])
+            self.begin_fio_bd[w].append([0, None])
+
+        begin = self.families[0][0]
+        for i in range(self.families.shape[0]):
+            if self.families[i][0] != begin:
+                self.begin_fio_bd[begin][0][1] = i
+                begin = self.families[i][0]
+                self.begin_fio_bd[begin][0][0] = i
+
+        begin = self.names[0][0]
+        for i in range(self.names.shape[0]):
+            if self.names[i][0] != begin:
+                self.begin_fio_bd[begin][1][1] = i
+                self.begin_fio_bd[begin][2][1] = i
+                begin = self.names[i][0]
+                self.begin_fio_bd[begin][1][0] = i
+                self.begin_fio_bd[begin][2][0] = i
+
+        # begin = self.surnames[0][0]
+        # for i in range(self.surnames.shape[0]):
+        #    if self.surnames[i][0] != begin:
+        #        self.begin_fio_bd[begin][2][1] = i
+        #        begin = self.surnames[i][0]
+        #        self.begin_fio_bd[begin][2][0] = i
+
+        self.begin_fio_bd['Я'][0][1] = self.families.shape[0]
+        self.begin_fio_bd['Я'][1][1] = self.names.shape[0]
+        self.begin_fio_bd['Я'][2][1] = self.surnames.shape[0]
+
+        self.dict = enchant.Dict('ru_RU')
+        self.my_bd = [self.bach_number, self.bach_name, self.mag_number, self.mag_name, self.spec_number,
+                      self.spec_name, self.universities, self.names, self.surnames, self.families]
+
+    def initialize(self):
+        self.prob_words = []
+        self.best_month_rate = 0
+        self.count_month = [0] * 12
+        self.best_month = [[None, 0] for i in range(3)]
+
+    '''def __init__(self):
         self.prob_words = []
         sogl1 = 'йцкгшщзхфвпрджчмьб'
         sogl2 = 'нслт'
@@ -222,6 +732,7 @@ class FindWord:
         self.dict = enchant.Dict('ru_RU')
         self.my_bd = [self.bach_number, self.bach_name, self.mag_number, self.mag_name, self.spec_number,
                       self.spec_name, self.universities, self.names, self.surnames, self.families]
+    '''
 
     def find_bd_word(self, word, bd, max_score, result_bd, result_word):
         for word_bd in bd:
@@ -296,13 +807,17 @@ class FindWord:
             city = possible_cities[1]
             if '.' in city:
                 city = city[city.find('.')+1:]
+            if 'r' in city:
+                city = city.replace('r', '')
+            city = city.upper()
             city = self.filterForRegNum(city)
 
-            city = self.translate_word(city, [])
+            #city = self.translate_word(city, [])
             all_words = self.check_before_translate(city, size=len(city))
 
             city = lv.quickmedian(all_words)
             city = city.lower().capitalize()
+            city = 'г. '+city
         best_cities = self.__check_best_word(self.cities_university, city)
         return best_cities
 
@@ -674,7 +1189,17 @@ class FindWord:
             #data[i][1] = self.filt_words(data[i][1])
             d1 = self.checkfordigits(data[i][0])
             d2 = self.checkfordigits(data[i][1])
+            '''if i-1 > -1:
+                if self.check_digit(data[i-1][0]):
+                    if len(d1) < len(d2):
+                        if self.check_digit(d2[0]):
+                            del d2[0]
+                    elif len(d1) > len(d2):
+                        if self.check_digit(d1[0]):
+                            del d1[0]'''
+
             if len(d1) < len(d2):
+
                 d1 = d1+['']*(len(d2)-len(d1))
             elif len(d1) > len(d2):
                 d2 = d2+['']*(len(d1) - len(d2))
@@ -735,6 +1260,19 @@ class FindWord:
                 date.append('')
         date.append('года')
         full_dates = []
+        i = 0
+        l = len(date)
+        while i<l:
+            if type(date[i]) != str:
+                if type(date[i]) == list and len(date[i]) > 1:
+                    i+=1
+                else:
+                    del date[i]
+                    l = len(date)
+            else:
+                i+=1
+        if type(date[1]) != list:
+            date[1] = ['января', 'июня', 'ноября']
         for month in date[1]:
             full_dates.append(date[0]+' '+month+' '+date[2]+' '+date[3])
         #full_date = ' '.join(date)
@@ -856,20 +1394,22 @@ class FindWord:
         data = None
         if level != '':
             if level == 'бакалавр':
-                data = self.bach_name
+                data = self.bach_name.copy()
             if level == 'магистр':
-                data = self.mag_name
+                data = self.mag_name.copy()
             if level == 'специалитет':
-                data = self.spec_name
+                data = self.spec_name.copy()
         else:
-            data = np.unique(np.append(np.append(self.bach_name, self.mag_name), self.spec_name))
+            data = np.unique(np.append(np.append(self.bach_name, self.mag_name), self.spec_name)).copy()
 
         if word1 != '':
             all_names = self.__check_best_word(data, word1)
         else:
             words = []
             for word in name:
-                all_words = self.check_before_translate(word[0], size=15)
+                all_words = self.check_before_translate(word[0], size=12)
+                if len(all_words)>100000:
+                    all_words = list(np.random.choice(all_words, size = 100000//len(all_words[0])))
                 all_words = self.filt_words(all_words)
 
                 poss_word = lv.quickmedian(all_words)
@@ -915,7 +1455,7 @@ class FindWord:
             word_cmp = lv.quickmedian(all_words)
 
         if special_number !='':
-            poss_qualities = self.spec_quality[np.where(self.spec_number == special_number)]
+            poss_qualities = self.spec_quality[np.where(self.spec_number == special_number)].copy()
             poss_qualities = poss_qualities.split('.')
             best_word = self.__check_best_word(poss_qualities, word_cmp)
         else:

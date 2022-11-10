@@ -15,7 +15,14 @@ class Choose_correct_word:
         pass
 
 class Doctr:
-    def __init__(self, H, W):
+    def __init__(self):
+        self.model = ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn',
+                                   pretrained=True, export_as_straight_boxes=True)  # 'db_resnet50'
+        self.model.compiled_metrics = None
+        # self.doc = DocumentFile.from_images(filenames[0])
+        self.morph = pymorphy2.MorphAnalyzer(lang='ru')
+
+    def initialize(self, H, W):
         self.prev_max_block = [(0,0),(0,0)]
         self.max_block = [(0,0),(0,0)]
         self.max_blocks = [[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)]]
@@ -27,24 +34,8 @@ class Doctr:
         self.mid_x, self.mid_y = 0, 0
         self.avg_h = 0
         self.avg_w = 0
-        '''for block in blocks:
-            if block[0] < self.min_x:
-                self.min_x = block[0]
-            if block[2] > self.max_x:
-                self.max_x = block[2]
-            if block[1] < self.min_y:
-                self.min_y = block[1]
-            if block[3] > self.max_y:
-                self.max_y = block[3]
-            avg_h += (block[3] - block[1])
-            avg_w += (block[2] - block[0])
-        self.mid_x = self.min_x + (self.max_x - self.min_x) / 2
-        self.mid_y = self.min_y + (self.max_y - self.min_y) / 2'''
-        self.model = ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn',
-                                   pretrained=True, export_as_straight_boxes=True)  # 'db_resnet50'
-        self.model.compiled_metrics = None
-        # self.doc = DocumentFile.from_images(filenames[0])
-        self.morph = pymorphy2.MorphAnalyzer(lang='ru')
+
+
 
 
     def detect_image(self, image, flag=False):
@@ -175,7 +166,56 @@ class Doctr:
         blocks = [x for n, x in enumerate(blocks) if x not in blocks[:n]]
         words = [x for n, x in enumerate(words) if x not in blocks[:n]]
 
-        return [blocks, words]
+        left_block, right_block = self.divide_left_right_words(blocks, words)
+        left_blocks, left_words = left_block[0], left_block[1]
+        right_blocks, right_words = right_block[0], right_block[1]
+
+        blocks.clear()
+        words.clear()
+
+        left_blocks, left_words = self.sort_by_geometry(left_blocks, left_words)
+        right_blocks, right_words = self.sort_by_geometry(right_blocks, right_words)
+
+        left_block = (left_blocks, left_words)
+        right_block = (right_blocks, right_words)
+        return [left_block, right_block]
+
+    def divide_left_right_words(self, blocks, words):
+        left_words = []
+        right_words = []
+        left_blocks = []
+        right_blocks = []
+        for ind, block in enumerate(blocks):
+            if block[2] < self.mid_x:
+                left_words.append(words[ind])
+                left_blocks.append(block)
+            else:
+                right_words.append(words[ind])
+                right_blocks.append(block)
+        return (left_blocks, left_words), (right_blocks, right_words)
+
+    def sort_by_geometry(self, blocks, words):
+        new_words = []
+        sort_with_ind = sorted(enumerate(blocks), key=lambda x: x[1][1])
+        i = 0
+        new_blocks = []
+        for i in range(1, len(sort_with_ind)):
+            block_copy = sort_with_ind[i]
+            for j in range(i-1, -1, -1):
+                if abs(sort_with_ind[j+1][1][1] - sort_with_ind[j][1][1])<5:
+                    #if abs(sort_with_ind[j+1][1][2] - sort_with_ind[j][1][0])<=5 or sort_with_ind[j][1][0]<=sort_with_ind[j+1][1][2]<= sort_with_ind[j][1][2] or sort_with_ind[j+1][1][0]<=sort_with_ind[j][1][2]<= sort_with_ind[j+1][1][2]:
+                        #block_copy = sort_with_ind[j][1]
+                        if sort_with_ind[j+1][1][0] < sort_with_ind[j][1][0]:
+                            sort_with_ind[j+1], sort_with_ind[j] = sort_with_ind[j], sort_with_ind[j+1]
+                else:
+                    break
+
+        indexes = [i[0] for i in sort_with_ind]
+        new_blocks = [i[1] for i in sort_with_ind]
+        sort_with_ind.clear()
+        for ind in indexes:
+            new_words.append(words[ind])
+        return new_blocks, new_words
 
     def to_right_size(self, H, W, blocks):
         new_block = []

@@ -115,7 +115,7 @@ class Rotate:
 
     def find_biggest_rect(self, image):
         #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        show_img(image, 'orginn')
+        #show_img(image, 'orginn')
         rgb_min = np.array((50, 50, 20), np.uint8)
         rgb_max = np.array((120, 100, 100), np.uint8)
         #hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -126,14 +126,20 @@ class Rotate:
         #thresh = cv2.inRange(hsv, hsv_min, hsv_max)
         H, W = thresh.shape[:2]
 
-        if np.sum(thresh)/255 > H*W/15:
-            heightKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 20))
-            thresh = cv2.erode(thresh, kernel=heightKernel, borderType=cv2.RETR_EXTERNAL)
+        #if np.sum(thresh)/255 > H*W/15:
+        #    heightKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 20))
+        #    thresh = cv2.erode(thresh, kernel=heightKernel, borderType=cv2.RETR_EXTERNAL)
 
-        widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 2))
-        blueModifiedImage = cv2.dilate(thresh, widthKernel)
+        widthKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 25))
+        #for i in range(10):
+        #    widthKernel[i] = np.array([0]*20)
+        #thresh = cv2.morphologyEx(thresh, cv2., widthKernel)
+        #show_img(thresh, 'Opening thresh')
+
+        blueModifiedImage = cv2.dilate(thresh, widthKernel, iterations=2, borderType=cv2.RETR_EXTERNAL)
+        #blueModifiedImage = cv2.morphologyEx(blueModifiedImage, cv2.MORPH_CLOSE, widthKernel)
+        #show_img(blueModifiedImage, 'blueModifiedImage')
         show_img(blueModifiedImage, 'blueModifiedImage')
-
         imageContours = cv2.findContours(blueModifiedImage.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         imageContours = imutils.grab_contours(imageContours)
 
@@ -201,7 +207,7 @@ class Rotate:
         show_img(orig_img, 'Origin')
 
 
-        rotated = self.rotate_image_true(orig_img, (-1)*degree)#(-1)*degree)
+        rotated = self.rotate_image_true(orig_img, degree)#(-1)*degree)
         show_img(rotated, 'Rotated full img')
 
         image_rotated_cropped = self.crop_around_center(
@@ -215,14 +221,23 @@ class Rotate:
 
         return image_rotated_cropped
 
+    def find_avg_color(self, image):
+        avr_color_row = np.average(image, axis = 0)
+        average_color = np.average(avr_color_row, axis=0)
+        print("avg_color: ", average_color)
+        return average_color
+
     def rotate(self, image_to_rotate, orig_image, key=1):
         RESIZED_IMAGE_HEIGHT = 600
         # orig_image = imutils.resize(orig_image.copy(), height=RESIZED_IMAGE_HEIGHT, width=int(w*RESIZED_IMAGE_HEIGHT/h))
         image_to_rotate = imutils.resize(image_to_rotate.copy(), height=RESIZED_IMAGE_HEIGHT)
+        self.find_avg_color(orig_image)
+        show_img(orig_image, 'image')
+        self.find_avg_color(image_to_rotate)
         orig_image = imutils.resize(orig_image.copy(), height=RESIZED_IMAGE_HEIGHT)
         original = orig_image.copy()
         rect = self.find_biggest_rect(image_to_rotate)
-        print('rect:', rect)
+        #print('rect:', rect)
         degree = self.try_find_new_degree(rect)
         print('Degree: ', degree)
         if degree == 0:
