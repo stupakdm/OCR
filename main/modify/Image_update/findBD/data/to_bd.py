@@ -111,5 +111,3 @@ def get_data(model = None):
         return None
 
 
-if __name__ == '__main__':
-    pass
