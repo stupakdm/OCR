@@ -79,204 +79,14 @@ class Families(Base):
 
     def __repr__(self) -> str:
         return f"Families(id={self.id!r}, family={self.family!r}"
-    
-"""
-def create_database():
-    try:
-        connection = psycopg2.connect(user="postgres",
-                                      password='1111',
-                                      host='127.0.0.1',
-                                      port="5432")
-        # database="postgres_db")
-        connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        cursor = connection.cursor()
 
-        sql_screate_database = 'create database prostgres_db'
-        cursor.execute(sql_screate_database)
-    except (Exception, Error) as error:
-        print("Ошибка при работе с PostgreSQL", error)
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-            print("Соединение с PostgreSQL закрыто")
 
-def create_table():
-    try:
-        connection = psycopg2.connect(user="postgres",
-                                      # пароль, который указали при установке PostgreSQL
-                                      password="1111",
-                                      host="127.0.0.1",
-                                      port="5432",
-                                      database="postgres_db")
-
-        # Курсор для выполнения операций с базой данных
-        cursor = connection.cursor()
-        create_table_bachelor = '''CREATE TABLE bachelor
-                                (id integer PRIMARY KEY NOT NULL,
-                                number text NOT NULL,
-                                name text NOT NULL);'''
-
-        # Выполнение команды: это создает новую таблицу
-        cursor.execute(create_table_bachelor)
-        connection.commit()
-
-        create_table_magistr = '''CREATE TABLE magistr
-                                (id integer PRIMARY KEY NOT NULL,
-                                number text NOT NULL,
-                                name text NOT NULL);'''
-        cursor.execute(create_table_magistr)
-        connection.commit()
-        create_table_speciality = '''CREATE TABLE speciality
-                                (id integer PRIMARY KEY NOT NULL,
-                                number text NOT NULL,
-                                name text NOT NULL,
-                                quality text);'''
-
-        cursor.execute(create_table_speciality)
-        connection.commit()
-
-        create_table_univerity = '''CREATE TABLE university
-                                            (id integer PRIMARY KEY NOT NULL,
-                                            full_name text NOT NULL,
-                                            adress text NOT NULL);'''
-
-        cursor.execute(create_table_univerity)
-        connection.commit()
-
-        create_table_namessurnames = '''CREATE TABLE namessurnames
-                                                (id integer PRIMARY KEY NOT NULL,
-                                                name text NOT NULL,
-                                                surname text NOT NULL,
-                                                priority integer NOT NULL);'''
-
-        cursor.execute(create_table_namessurnames)
-
-        connection.commit()
-        create_table_families = '''CREATE TABLE families
-                                                (id integer PRIMARY KEY NOT NULL,
-                                                family text NOT NULL);'''
-
-        cursor.execute(create_table_families)
-        connection.commit()
-    except (Exception, Error) as error:
-        print("Ошибка при работе с PostgreSQL", error)
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-            print("Соединение с PostgreSQL закрыто")
-
-def insert_values():
-    curr_dir = 'Updating/Optimize/SearchBD/data/'
-    try:
-        connection = psycopg2.connect(user="postgres",
-                                      # пароль, который указали при установке PostgreSQL
-                                      password="1111",
-                                      host="127.0.0.1",
-                                      port="5432",
-                                      database="postgres_db")
-
-        # Курсор для выполнения операций с базой данных
-        cursor = connection.cursor()
-
-        #Insert Values
-        bach = pd.read_csv(f'{curr_dir}/Bachelor.csv', encoding='utf-8', sep=';')
-        for i, row in bach.iterrows():
-            cursor.execute(f"INSERT INTO bachelor VALUES ({i}, {row['number']}, {row['name']})")
-            #print(row['number'], row['name'])
-        connection.commit()
-
-        bach.close()
-
-        mag = pd.read_csv(f'{curr_dir}/Magistr.csv', encoding='utf-8', sep=';')
-        for i, row in mag.iterrows():
-            cursor.execute(f"INSERT INTO magistr VALUES ({i}, {row['number']}, {row['name']})")
-            #print(row['number'], row['name'])
-        connection.commit()
-
-        spec_all = pd.read_csv(f'{curr_dir}/special_quality.csv', encoding='utf-8', sep=';')
-        spec_all['quality'].fillna('', inplace=True)
-        for i, row in spec_all.iterrows():
-            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['number']}, {row['name']}, {row['quality']})")
-            #print(row['number'], row['name'])
-        connection.commit()
-
-        universities = pd.read_csv(f'{curr_dir}/Университеты России.csv', encoding='utf-8', sep=',')
-        for i, row in universities.iterrows():
-            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['Full Name']}, {row['Adress']})")
-            #print(row['number'], row['name'])
-        connection.commit()
-
-        df_name = pd.read_csv(f'{curr_dir}Names_and_surnames2.csv', encoding='utf-8', sep=',')
-        for i, row in df_name.iterrows():
-            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['name']}, {row['surname']}, {row['priority']})")
-            #print(row['number'], row['name'])
-        connection.commit()
-
-        df_families = pd.read_csv(f'{curr_dir}families3.csv', encoding='utf-8')
-        for i, row in df_families.iterrows():
-            cursor.execute(f"INSERT INTO speciality VALUES ({i}, {row['family']})")
-            #print(row['number'], row['name'])
-        connection.commit()
-
-    except (Exception, Error) as error:
-        print("Ошибка при работе с PostgreSQL", error)
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-            print("Соединение с PostgreSQL закрыто")
-        #f = open('Bachelor.csv')
-
-def get_values():
-    try:
-        connection = psycopg2.connect(user="postgres",
-                                      # пароль, который указали при установке PostgreSQL
-                                      password="1111",
-                                      host="127.0.0.1",
-                                      port="5432",
-                                      database="postgres_db")
-        cursor = connection.cursor()
-        sql_get_bachelor = 'SELECT * FROM bachelor'
-        cursor.execute(sql_get_bachelor)
-        bach = cursor.fetchall()
-
-        sql_get_magistr = 'SELECT * FROM magistr'
-        cursor.execute(sql_get_magistr)
-        mag = cursor.fetchall()
-
-        sql_get_speciality = 'SELECT * FROM speciality'
-        cursor.execute(sql_get_speciality)
-        spec = cursor.fetchall()
-
-        sql_get_university = 'SELECT * FROM university'
-        cursor.execute(sql_get_university)
-        university = cursor.fetchall()
-
-        sql_get_namessurnames = 'SELECT * FROM namessurnames'
-        cursor.execute(sql_get_namessurnames)
-        namessurnames = cursor.fetchall()
-
-        sql_get_families = 'SELECT * FROM families'
-        cursor.execute(sql_get_families)
-        families = cursor.fetchall()
-
-    except (Exception, Error) as error:
-        print("Ошибка при работе с PostgreSQL", error)
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
-            print("Соединение с PostgreSQL закрыто")
-"""
-
-def create_table():
-    engine = create_engine("postgresql+psycopg2://postgres:1111@localhost/sqlalchemy_diplom")
+def create_table(engine_name = "postgresql+psycopg2://postgres:1111@localhost/sqlalchemy_diplom",):
+    engine = create_engine(engine_name)
     Base.metadata.create_all(engine)
 
-def append_data():
-    engine = create_engine("postgresql+psycopg2://postgres:1111@localhost/sqlalchemy_diplom")
+def append_data(engine_name = "postgresql+psycopg2://postgres:1111@localhost/sqlalchemy_diplom",):
+    engine = create_engine(engine_name)
 
     with Session(engine) as session:
         bach = pd.read_csv(f'Bachelor.csv', encoding='utf-8', sep=';')
@@ -335,8 +145,8 @@ def append_data():
 
         session.commit()
 
-def get_data(model = None):
-    engine = create_engine("postgresql+psycopg2://postgres:1111@localhost/sqlalchemy_diplom")
+def get_data(engine_name = "postgresql+psycopg2://postgres:1111@localhost/sqlalchemy_diplom", model = None):
+    engine = create_engine(engine_name)
 
     if model != None:
         session = Session(engine)
@@ -345,6 +155,3 @@ def get_data(model = None):
         return result
     else:
         return None
-
-if __name__ == '__main__':
-    pass
