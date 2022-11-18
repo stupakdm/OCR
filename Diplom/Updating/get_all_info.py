@@ -4,6 +4,8 @@ from Optimize.Rotate_diplom import Rotate
 from Optimize.SearchBD.correct_word import *
 from Optimize.SearchBD.choose_right_BD import FindWord
 
+from get_all_module import GetFunctions
+
 try:
     from PIL import Image
 except ImportError:
@@ -13,11 +15,16 @@ except ImportError:
 #import pytesseract as pt
 
 
-class Diplom:
+class Diplom(GetFunctions):
 
     #0
     #begin
     def __init__(self):
+        '''
+        Конструктор
+        Запускается в самом начале
+        Здесь передаются все изначальные параметры, которые впоследствии не изменяются
+        '''
         self.upd = Update()
         self.rot = Rotate()
         self.doctr_model = Doctr()
@@ -41,12 +48,23 @@ class Diplom:
     #0.5
     #Preparing
     def initialize(self, path):
+        '''
+        Запускается при каждой новой фотографии
+        Обнуляет параметры снизу
+        path: путь по которому хранится фото
+        '''
         self.city_possible = None
         self.orig_image = cv2.imread(path)
         self.result = dict()
 
     # 1
     def __modify_image(self, image, flag = 1):
+        '''
+        Улучшение качества изображения
+        image: 3 мерное изображение
+        flag: принимает значения 0 и 1
+        :return: Возвращает улучшенное изображение
+        '''
         try:
             if flag == 1:
 
@@ -54,25 +72,24 @@ class Diplom:
         except:
             image = image
 
-        #upd.resize_image(image)
-        #upd.find_contours(image)
 
-        #upd.check_image(image)
-        #show_img(image, 'Before Cropp')
 
         image = self.upd.corner_images(image)
-        #show_img(image, 'Corner cropp')
-        #upd.equa_CLAHE_change_hist(image)
-        #upd.calc_hist(image)
-        #upd.linear_change_hist(image)
+
         image = self.upd.unsharp_mask(image, sigma=1.5, threshold=1, amount=2.0, kernel_size=(3,3))
         if flag == 2:
             image = self.upd.black_white(image)
-        #show_img(image, 'Unsharp mask')
+
         return image
 
     # 2
     def __segmentation(self, image):
+        '''
+        Разбиение картинки по текстовым блокам
+        image: 3 мерное изображение
+        :return: left_block, right_block - два массива, размерностью 2
+        Каждый массив хранит 2 массива: первый - координаты текстовых блоков, второй - текст в этом блоке
+        '''
         H, W = image.shape[:2]
         self.doctr_model.initialize(H, W)
         left_block, right_block = self.doctr_model.detect_image(image)
@@ -81,53 +98,46 @@ class Diplom:
         #print('length: ', len(blocks), len(words))
         return left_block, right_block
 
-    def __check_digit(self, word):
-        word = ''.join([w for w in word if w not in ".,':;"])
-        count_digit = 0
-        for w in word:
-            if w.isdigit():
-                count_digit+=1
-        if len(word)<4:
-            if count_digit == len(word):
-                return True
-            else:
-                return False
-        else:
-            if count_digit >= len(word)//2:
-                return True
-            elif count_digit >= len(word)//3 and '2' in word and '0' in word and 'a' in word:
-                return True
-        return False
+
 
     # 3
     def __symbol_blocks(self, left_block, right_block, img):
+        '''
+        Распознавание текстовой информмации на текстовых блоках
+        left_block, right_block - два массива, размерностью 2
+        Каждый массив хранит 2 массива: первый - координаты текстовых блоков, второй - текст в этом блоке
+        img: 3 мерное изображение
+        :return: массив, размерностью 2, первый - текст на левой стороне, второй - текст на правой стороне
+        '''
         info = []
 
-        max_block = self.doctr_model.max_block_left
+        #specs = ['бакалавр', 'магистр', 'специалитет']
+        #max_block = self.doctr_model.max_block_left
 
         #plt.imshow(img[max_block[1]:max_block[3], max_block[0]:max_block[2]])
         #plt.show()
 
         #avg_w = avg_w/len(blocks)
         #avg_h = avg_h/len(blocks)
-        count_digit_left = 0
-        min_gap = 0
+        count_digit_left, left_count_strings = 0, 0
+        min_gap_x, min_gap_y = 0, 0
         flag = [0, 0]
         left_max_blocks = [[[0,0,0,0],'',''] for i in range(3)]
-        right_blocks = []
-        new_words = []
-        prev_block = 0
-        min_gap_y = 0
-        blocks_len = 0
+        #right_blocks = []
+        #new_words = []
+        prev_block, blocks_len = 0, 0
+        #min_gap_y = 0
+        #blocks_len = 0
+
         specs = ['бакалавр', 'магистр', 'специалитет']
+        best_word = specs[0]
+        rate_best = 0
         y_prev= 0
         prev_string = ['']
         current_string = []
-        rate_best = 0
-        best_word = specs[0]
-        left_count_strings = 0
+        #left_count_strings = 0
         prev_y = 0
-        save_prev_word_ind = None
+        #save_prev_word_ind = None
         all_blocks = (left_block, right_block)
         #self.city_possible = [words[0], words[0]]
         for i in range(len(all_blocks)):
@@ -148,8 +158,8 @@ class Diplom:
                                 parts += left_max_blocks
                                 info1.append(parts.copy())
                                 parts.clear()
-                                index_word = self.rightBD.check_for_letter(words[ind])
-                                word = self.__text_recognition(block_img, self.tes_model)
+                                index_word = self.check_for_letter(words[ind])
+                                word = self.text_recognition(block_img, self.tes_model)
                                 if index_word == -1:
                                     parts.append([word, words[ind]])
                                 else:
@@ -161,9 +171,9 @@ class Diplom:
                                     parts.append([words[ind][index_word+1:], word])
                                 flag = 1
                                 prev_block = block
-                                dist = blocks[ind + 1][3] - block[1]
-                                min_gap = (blocks[ind + 1][2] - block[0]) / 6
-                                min_gap = (block[2] - block[0]) / 6
+                                #dist = blocks[ind + 1][3] - block[1]
+                                #min_gap = (blocks[ind + 1][2] - block[0]) / 6
+                                min_gap_x = (block[2] - block[0]) / 6
                                 min_gap_y = (block[3] - block[1]) / 2
                                 # min_gap_y = (blocks[ind+1][3] - block[1])/3
                                 continue
@@ -175,7 +185,7 @@ class Diplom:
                                     for z in range(len(left_max_blocks) - 1, j, -1):
                                         left_max_blocks[z] = left_max_blocks[z - 1].copy()
                                     left_max_blocks[j][0] = block
-                                    word = self.__text_recognition(block_img, self.tes_model)
+                                    word = self.text_recognition(block_img, self.tes_model)
                                     another_word = words[ind]
                                     left_max_blocks[j][1] = word
                                     left_max_blocks[j][2] = another_word
@@ -183,7 +193,7 @@ class Diplom:
                             continue
                         elif flag == 1:
                             if abs(prev_block[3] - block[3]) <= min_gap_y:
-                                word = self.__text_recognition(block_img, self.tes_model)
+                                word = self.text_recognition(block_img, self.tes_model)
                                 parts.append([words[ind], word])
                                 prev_block = block
                             else:
@@ -192,15 +202,17 @@ class Diplom:
                                 flag += 1
                                 prev_block = block
                                 y_prev = block[1]
-                                blocks_len += 1
+                                #blocks_len += 1
                                 current_string = [word]
                             continue
                         elif flag == 2:
                             #block_img = img[prev_block[1]:prev_block[3], prev_block[0]:prev_block[2]]
                             block_img = self.__modify_image(block_img, flag=2)
-                            word = self.__text_recognition(block_img, self.tes_model)
+                            word = self.text_recognition(block_img, self.tes_model)
                             t = False
                             if word != '':
+                                #best_word = specs[0]
+                                #rate_best = 0
                                 for word_true in specs:
                                     rate = self.rightBD.cmp_rates(word.lower(), word_true)
                                     if rate > rate_best:
@@ -228,14 +240,14 @@ class Diplom:
 
                             continue
 
-                    elif flag[1] == 1 and i == 0 and self.__compare(block, self.doctr_model.max_block_left):
+                    elif flag[1] == 1 and i == 0 and self.compare(block, self.doctr_model.max_block_left):
                         parts.append(words[ind])
                         info1.append(parts.copy())
                         parts.clear()
                         flag[1]+=1
                         continue
 
-                    elif self.__compare(block, self.doctr_model.prev_max_block_left) and i==0:
+                    elif self.compare(block, self.doctr_model.prev_max_block_left) and i==0:
                         #parts.append(words[save_prev_word_ind])
                         info1.append(parts.copy())
                         #prev_y = block[1]
@@ -244,24 +256,24 @@ class Diplom:
                         flag[1] += 1
                         continue
 
-                    elif block[3] > max_block[3] and i == 0 and flag[1] == 2:
-                        if self.__check_digit(words[ind]) and count_digit_left < 2:
+                    elif block[3] > self.doctr_model.max_block_left[3] and i == 0 and flag[1] == 2:
+                        if self.check_digit(words[ind]) and count_digit_left < 2:
                             if len(words[ind]) < 3:
                                 continue
                             count_digit_left +=1
                             if count_digit_left == 1:
-                                min_gap = (block[2]-block[0])/6
+                                min_gap_x = (block[2]-block[0])/6
                             #parts.append(words[ind])
                             block_img = self.__modify_image(block_img, flag=2)
 
-                            word = self.__text_recognition(block_img, self.tes_model)
+                            word = self.text_recognition(block_img, self.tes_model)
                             parts.append([words[ind], word])
                             if count_digit_left == 2:
                                 info1.append(parts.copy())
                                 parts.clear()
                                 prev_y = block[1]
                             continue
-                        elif self.__check_digit(words[ind]) and count_digit_left >=2:
+                        elif self.check_digit(words[ind]) and count_digit_left >=2:
                             if abs(block[1] - prev_y) >5:
                                 left_count_strings+=1
                             prev_y = block[1]
@@ -274,20 +286,20 @@ class Diplom:
                                 continue
                             if left_count_strings == 3:
                                 block_img = self.__modify_image(block_img, flag=2)
-                                word = self.__text_recognition(block_img, self.tes_model)
+                                word = self.text_recognition(block_img, self.tes_model)
                                 parts.append([words[ind], word])
                                 continue
-                            left_gap = block[0] - min_gap
-                            right_gap = block[2] + min_gap
+                            left_gap = block[0] - min_gap_x
+                            right_gap = block[2] + min_gap_x
                             block_img = self.__modify_image(block_img, flag=2)
-                            word = self.__text_recognition(block_img, self.tes_model)
+                            word = self.text_recognition(block_img, self.tes_model)
                             if [words[ind], word] in parts:
                                 continue
                             if blocks[ind-1][0]<=left_gap<=blocks[ind-1][2]:
                                 prev_block = img[blocks[ind-1][1]:blocks[ind-1][3],
                                              blocks[ind-1][0]:blocks[ind-1][2]]
                                 prev_block = self.__modify_image(prev_block, flag=2)
-                                word = self.__text_recognition(prev_block, self.tes_model)
+                                word = self.text_recognition(prev_block, self.tes_model)
                                 for j in range(len(parts)):
                                     if words[ind-1] == parts[j][0]:
                                         break
@@ -295,14 +307,14 @@ class Diplom:
                                 #if [words[ind-1], word] not in parts:
                                     parts.append([words[ind-1], word])
                             #block_img = self.__modify_image(block_img, flag=2)
-                            word = self.__text_recognition(block_img, self.tes_model)
+                            word = self.text_recognition(block_img, self.tes_model)
                             parts.append([words[ind], word])
                             if len(blocks) != ind+1:
                                 if blocks[ind+1][0]<=right_gap<=blocks[ind+1][2]:
                                     next_block = img[blocks[ind+1][1]:blocks[ind+1][3],
                                                  blocks[ind+1][0]:blocks[ind+1][2]]
                                     next_block = self.__modify_image(next_block, flag=2)
-                                    word = self.__text_recognition(next_block, self.tes_model)
+                                    word = self.text_recognition(next_block, self.tes_model)
                                     for j in range(len(parts)):
                                         if words[ind +1] == parts[j][0]:
                                             break
@@ -315,7 +327,7 @@ class Diplom:
                                 #if left_count_strings == 5:
                                     #block_img = self.__modify_image(block_img, flag=2)
                                     #save_prev_word_ind = ind
-                                    #word = self.__text_recognition(block_img, self.tes_model)
+                                    #word = self.text_recognition(block_img, self.tes_model)
                                     #parts.append([words[ind], word])
                                 if abs(block[1]-prev_y) > 5:
                                     left_count_strings +=1
@@ -330,10 +342,9 @@ class Diplom:
                         self.city_possible[1] = words[ind]
                     if i == 0 and flag[1] != 2:
                         block_img = self.__modify_image(block_img, flag = 2)
-                        #show_img(block_img, 'block_img')
                         #print(words[ind])
-                        save_prev_word_ind = ind
-                        word = self.__text_recognition(block_img, self.tes_model)
+                        #save_prev_word_ind = ind
+                        word = self.text_recognition(block_img, self.tes_model)
                         parts.append(word)
 
                 #    new_words.append(words[ind])
@@ -349,34 +360,32 @@ class Diplom:
             flag = 0
 
 
+
+
         return info
 
 
-    def __compare(self, block1, block2):
+    '''def __compare(self, block1, block2):
         for i in range(len(block1)):
             if block1[i] != block2[i]:
                 return False
         return True
 
-    # 3.5
-    def look_digits(self, word):
-        digit_count = 0
-        for w in word:
-            if w.isdigit():
-                digit_count+=1
-        if digit_count > 4:
-            return True
-        else:
-            return False
+    
 
     # 4
     def __text_recognition(self, block, model):
         word = model.detect_text(block)
         return word
-
+    '''
 
     # 5.1
     def __chooseBD_left(self, info):
+        '''
+        Сопоставление текстовой информации на лвой стороне изображения с базами данных
+        info: массив, содержащий информацию на левой стороне
+        :return: заполненный словарь для левой стороны изображения
+        '''
         words = []
         new_word = ''
         chapter = []
@@ -385,7 +394,7 @@ class Diplom:
             chapter = []
             #for part in info[i]:
             if i == 0:
-                probable_city = info[i][-1]
+                #probable_city = info[i][-1]
                 new_word = info[i][:-1]
                 new_word = [x for x in new_word if x != '']
                 new_word = ' '.join(new_word)
@@ -449,6 +458,11 @@ class Diplom:
 
     # 5.2
     def __chooseBD_right(self, info):
+        '''
+        Сопоставление текстовой информации на правой стороне изображения с базами данных
+        info: массив, содержащий информацию на левой стороне
+        :return: заполненный словарь для правой стороны изображения
+        '''
         confidence = True
         try:
             for i in range(len(info)):
@@ -479,7 +493,7 @@ class Diplom:
 
                 if i == 1:
                     spec_number = info[i][0]
-                    if not self.__check_digit(spec_number):
+                    if not self.check_digit(spec_number):
                         spec_number = info[i][1]
                     spec_name = info[i+1]
                     try:
@@ -538,7 +552,10 @@ class Diplom:
         self.result['Квалификация:'] = ''
 
     def conveer(self):
-
+        '''
+        Ход работы всего процесса OCR
+        :return: заполненный словарь информации для диплома
+        '''
         #Trye
 
         # 1
@@ -549,7 +566,7 @@ class Diplom:
             image = self.__modify_image(image)
         except:
             pass
-        show_img(image, 'after modifing')
+        #show_img(image, 'after modifing')
         # 2
         left_block, right_block = self.__segmentation(image)
 
