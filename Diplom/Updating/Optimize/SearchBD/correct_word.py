@@ -1,4 +1,4 @@
-import os, re
+import os
 
 # from doctr.io import read_img_as_numpy, read_img_as_tensor
 # import tensorflow as tf
@@ -9,13 +9,24 @@ from doctr.io import DocumentFile  # , read_img_as_numpy, read_img_as_tensor
 from doctr.models import ocr_predictor
 import pytesseract as pt
 
+from words_modules import CorrectFunctions
 
-class Choose_correct_word:
-    def __init__(self, image):
-        pass
 
-class Doctr:
+class Doctr(CorrectFunctions):
     def __init__(self):
+        '''
+        Конструктор
+        Запускается в самом начале
+        Здесь передаются все изначальные параметры, которые впоследствии не изменяются
+        '''
+        self.avg_w, self.avg_h = None, None
+        self.mid_y, self.mid_x = None, None
+        self.max_y, self.max_x = None, None
+        self.min_y, self.min_x = None, None
+        self.max_blocks = None
+        self.max_square = None
+        self.max_block = None
+        self.prev_max_block = None
         self.model = ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn',
                                    pretrained=True, export_as_straight_boxes=True)  # 'db_resnet50'
         self.model.compiled_metrics = None
@@ -23,6 +34,12 @@ class Doctr:
         self.morph = pymorphy2.MorphAnalyzer(lang='ru')
 
     def initialize(self, H, W):
+        '''
+        Запускается при каждой новой фотографии
+        Обнуляет параметры снизу
+        H: длина изображения
+        W: ширина изображения
+        '''
         self.prev_max_block = [(0,0),(0,0)]
         self.max_block = [(0,0),(0,0)]
         self.max_blocks = [[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)],[(0,0),(0,0)]]
@@ -39,8 +56,12 @@ class Doctr:
 
 
     def detect_image(self, image, flag=False):
+        '''
+        Распознавание текстовых блоков на изображении
+        image: 3-мерное изображение
+        '''
         H, W = image.shape[:2]
-        if flag == True:
+        if flag:
             scale_down = 1.5
             image = cv2.resize(image, None, fx=scale_down, fy=scale_down, interpolation=cv2.INTER_LINEAR)
             #new_image = np.zeros((H * 5, W * 5, 3))
@@ -109,8 +130,8 @@ class Doctr:
         result = self.model(doc)
         #result.show(doc)
         # Show DocTR result
-        if flag:
-            input()
+        #if flag:
+        #    input()
             #plt.imshow(image)
             #plt.show()
             #result.show(doc)
@@ -166,7 +187,7 @@ class Doctr:
         blocks = [x for n, x in enumerate(blocks) if x not in blocks[:n]]
         words = [x for n, x in enumerate(words) if x not in blocks[:n]]
 
-        left_block, right_block = self.divide_left_right_words(blocks, words)
+        left_block, right_block = self.divide_left_right_words(blocks, words, self.mid_x)
         left_blocks, left_words = left_block[0], left_block[1]
         right_blocks, right_words = right_block[0], right_block[1]
 
@@ -180,7 +201,7 @@ class Doctr:
         right_block = (right_blocks, right_words)
         return [left_block, right_block]
 
-    def divide_left_right_words(self, blocks, words):
+    '''def divide_left_right_words(self, blocks, words):
         left_words = []
         right_words = []
         left_blocks = []
@@ -192,15 +213,15 @@ class Doctr:
             else:
                 right_words.append(words[ind])
                 right_blocks.append(block)
-        return (left_blocks, left_words), (right_blocks, right_words)
+        return (left_blocks, left_words), (right_blocks, right_words)'''
 
-    def sort_by_geometry(self, blocks, words):
+    '''def sort_by_geometry(self, blocks, words):
         new_words = []
         sort_with_ind = sorted(enumerate(blocks), key=lambda x: x[1][1])
-        i = 0
-        new_blocks = []
+        #i = 0
+        #new_blocks = []
         for i in range(1, len(sort_with_ind)):
-            block_copy = sort_with_ind[i]
+            #block_copy = sort_with_ind[i]
             for j in range(i-1, -1, -1):
                 if abs(sort_with_ind[j+1][1][1] - sort_with_ind[j][1][1])<5:
                     #if abs(sort_with_ind[j+1][1][2] - sort_with_ind[j][1][0])<=5 or sort_with_ind[j][1][0]<=sort_with_ind[j+1][1][2]<= sort_with_ind[j][1][2] or sort_with_ind[j+1][1][0]<=sort_with_ind[j][1][2]<= sort_with_ind[j+1][1][2]:
@@ -215,23 +236,25 @@ class Doctr:
         sort_with_ind.clear()
         for ind in indexes:
             new_words.append(words[ind])
-        return new_blocks, new_words
+        return new_blocks, new_words'''
 
-    def to_right_size(self, H, W, blocks):
+    '''def to_right_size(self, H, W, blocks):
         new_block = []
         for block in blocks:
             new_block.append(self.new_size(H, W, block))
         return new_block
 
     def new_size(self, H, W, block):
-        return [int(block[0][0] * W), int(block[0][1] * H), int(block[1][0] * W), int(block[1][1] * H)]
-
-
-
-
+        return [int(block[0][0] * W), int(block[0][1] * H), int(block[1][0] * W), int(block[1][1] * H)]'''
 
 
     def look_geometry(self, new_word, blocks, words):
+        '''
+        Нахождение текстовых блоков среди всего списка блоков, найденных docTR
+        new_word: список содеражащий параметры для каждого распознаного слова
+        blocks: список блоков, которые будут возвращены
+        words: Список слов, которые будут возвращены
+        '''
         for block in new_word:
 
             if 'pages' in block.keys():
@@ -287,6 +310,9 @@ class Doctr:
 
 
 class Tesseract:
+    '''
+    Tesseract - нейронная сеть для распознавания слов по текстовым блокам
+    '''
     def __init__(self):
         pass
 
@@ -300,6 +326,6 @@ class Tesseract:
         # text = pt.pytesseract.image_to_string(img, lang='rus', config = f'--psm 12 --oem 3 -c tessedit_char_whitelist={rus}{rus.upper()}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
         return text.strip().lower().capitalize()
 
-    def ocr_core_boxes(self, img):
+    '''def ocr_core_boxes(self, img):
         boxes = pt.pytesseract.image_to_boxes(img)
-        return boxes
+        return boxes'''
