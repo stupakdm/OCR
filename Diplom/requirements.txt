@@ -1,0 +1,13 @@
+pyenchant
+python-Levenshtein
+Levenshtein
+numpy
+pandas
+opencv-python
+matplotlib
+pymorphy2
+imutils
+SQLAlchemy
+psycopg2
+python-doctr
+pytesseract
