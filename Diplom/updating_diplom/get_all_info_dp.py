@@ -409,6 +409,9 @@ class Diplom:
                 except:
                     level = ''
                 self.result['Степень:'] = level
+                if self.result['Степень:'] != 'специалитет':
+                    self.result.pop('Квалификация:')
+
             if i == 2:
                 series = info[i][0][0]
                 number = info[i][1][0]
@@ -513,7 +516,7 @@ class Diplom:
                             quality = ''
                         self.result['Квалификация:'] = quality
                     else:
-                        if self.result['Степень:'] != '':
+                        if self.result['Степень:'] != '' and 'Квалификация:' in self.result.keys():
                             self.result.pop('Квалификация:')
                             break
                         cmp_speciality = info[i][0]

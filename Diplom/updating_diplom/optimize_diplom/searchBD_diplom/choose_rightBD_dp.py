@@ -958,7 +958,7 @@ class FindWord:
         else:
             words = []
             for word in name:
-                all_words = self.check_before_translate(word[0], size=12)
+                all_words = self.check_before_translate(word[0], size=10)
                 if len(all_words)>100000:
                     all_words = list(np.random.choice(all_words, size = 100000//len(all_words[0])))
                 all_words = self.filt_words(all_words)
@@ -1047,7 +1047,7 @@ class FindWord:
                 words = all_words.split('.')
                 for word_valid in words:
                     rate = self.cmp_rates(word_cmp, word_valid)
-                    if rate>best_rate:
+                    if rate>best_rate and abs(len(word_cmp) - len(word_valid)) < 3:
                         best_rate = rate
                         best_word = word_valid
 

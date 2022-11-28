@@ -4,7 +4,7 @@ from Diplom.updating_diplom.get_all_info_dp import Diplom
 
 
 if __name__ == '__main__':
-    diplom_names =  [3,4,5,8,9]+[i for i in range(13,30)]#[13]#[3,4,5,8,9]+[i for i in range(12,21)]#[3,4,5,8,9]#[8, 10]#[3, 4, 5, 8, 9]#[3,4,5]#[3,4,5]   #1,2
+    diplom_names =  [24]#[3,4,5,8,9]+[i for i in range(13,30)]#[13]#[3,4,5,8,9]+[i for i in range(12,21)]#[3,4,5,8,9]#[8, 10]#[3, 4, 5, 8, 9]#[3,4,5]#[3,4,5]   #1,2
     paths = []
     for i in diplom_names:
         paths.append(f'./templates_diplom/diplom{i}.jpg')
