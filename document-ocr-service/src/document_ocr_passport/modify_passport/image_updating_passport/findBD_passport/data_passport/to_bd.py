@@ -78,7 +78,7 @@ def append_data():
     session.commit()
     session.close()
 
-    os.system("rm {directory}RussianCities.tsv")
+    os.system(f"rm {directory}RussianCities.tsv")
 
 # Достать все данные из БД
 def get_items():
