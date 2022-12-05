@@ -47,13 +47,13 @@ def running_config(path, passport):
 if __name__ == '__main__':
 
     # Файлы для тестирования модели
-    correct_files = [ 2,3, 9, 12, 13,14, 20, 21, 22]#[ 20, 21, 22, 23, 24]#[11, 12, 13, 14,15,16]#[9, 11, 12, 13]#[2, 3, 4, 7, 9, 13, 14, 15,16]#[1,2,3,4,7,9][3, 4, 7, 9] #[1,2,3,4,7,8,9]#[1, 2, 3, 4, 7, 9] #, 2, 3, 4, 7,9]
+    passport_names = [ 2,3, 9, 12, 13,14, 20, 21, 22]#[ 20, 21, 22, 23, 24]#[11, 12, 13, 14,15,16]#[9, 11, 12, 13]#[2, 3, 4, 7, 9, 13, 14, 15,16]#[1,2,3,4,7,9][3, 4, 7, 9] #[1,2,3,4,7,8,9]#[1, 2, 3, 4, 7, 9] #, 2, 3, 4, 7,9]
 
     passport = Passport()
-    filenames = [(f'media/passport_photo/orig{i}.jpeg', i) for i in correct_files]
+    filenames = [(f'media/passport_photo/orig{i}.jpeg', i) for i in passport_names]
 
     #os.environ['OMP_THREAD_LIMIT'] = '4'
-    pool_size = len(correct_files)
+    pool_size = len(passport_names)
     #poos = ThreadPool(pool_size)
 
     # Parallel with asyncio
