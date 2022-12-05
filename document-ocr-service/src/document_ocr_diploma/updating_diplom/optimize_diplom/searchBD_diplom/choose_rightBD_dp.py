@@ -8,6 +8,7 @@ import re
 '''import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2 import Error'''
+#from src.models_all import Bachelor, Magistr, Speciality, University, Namessurnames, Families, get_item
 from updating_diplom.optimize_diplom.searchBD_diplom.words_modules import BDFunctions, Get_BD
 
 #from sqlalchemy.orm import sessionmaker
